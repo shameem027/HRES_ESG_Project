@@ -1,0 +1,31 @@
+# --- File: docker/Dockerfile.api (Definitive Final Version - Curl Installed) ---
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install curl (and build-essential for other potential dependencies)
+# -------------------- THE DEFINITIVE FIX IS HERE --------------------
+RUN apt-get update && apt-get install -y --no-install-recommends curl build-essential \
+    && rm -rf /var/lib/apt/lists/*
+# --------------------------------------------------------------------
+
+# This makes Python imports reliable
+ENV PYTHONPATH=/app
+
+# Standard Flask environment variables
+ENV FLASK_APP=api.recommender_api
+ENV FLASK_RUN_HOST=0.0.0.0
+ENV FLASK_RUN_PORT=8080
+
+# This command relies on requirements.txt being in the project root.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application's Python packages
+COPY ./src /app/src
+COPY ./api /app/api
+
+EXPOSE 8080
+
+# Use the standard command to run the Flask application
+CMD ["flask", "run"]

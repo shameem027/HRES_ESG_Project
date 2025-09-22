@@ -1,0 +1,24 @@
+# --- File: requirements.txt (Definitive Final Version - Unlocked) ---
+
+# Core Data Science & Simulation
+pandas
+numpy
+scikit-learn
+tqdm
+
+# API Framework
+Flask
+openai
+tiktoken
+
+# UI Framework
+streamlit
+plotly
+requests
+
+# Development & MLOps Platform
+jupyterlab
+mlflow
+psycopg2-binary
+SQLAlchemy<2.0
+alembic<2.0

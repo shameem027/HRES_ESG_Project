@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+# IDE specific files
+.idea/
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# MLflow Local Tracking
+mlruns/
+mlflow.db
+
+# Docker Volumes (Local Persistent Data)
+postgres_db_data/
+mlflow_artifacts/
+
+# Local environment variables - ONLY ignore the .env file inside the 'docker' folder
+docker/.env
+
+# Airflow/Application Logs - CRITICAL FIX for "Invalid argument" error
+logs/

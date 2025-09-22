@@ -1,0 +1,7 @@
+mlflow==3.3.1
+openai
+tiktoken
+# Evaluation metrics
+rouge-score
+# Text processing  
+sentence-transformers

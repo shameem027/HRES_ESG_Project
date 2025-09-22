@@ -1,0 +1,6 @@
+# --- File: docker/Dockerfile.mlflow (Definitive Final Version) ---
+FROM python:3.11-slim
+WORKDIR /mlflow_server
+RUN pip install --no-cache-dir mlflow==2.9.2 "sqlalchemy<2.0" alembic
+EXPOSE 5000
+CMD ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", "--backend-store-uri", "sqlite:////mlflow/db/mlflow.db", "--default-artifact-root", "/mlflow/artifacts"]
