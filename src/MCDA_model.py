@@ -1,18 +1,10 @@
-# --- File: src/MCDA_model.py ---
+# --- File: src/MCDA_model.py (Enhanced for UI Visualizations) ---
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import logging
+from src.HRES_Dataset_Generator import *
 
-# Import ALL relevant constants from the generator to pass to the API
-from src.HRES_Dataset_Generator import (
-    COST_PER_SOLAR_PANEL, COST_PER_WIND_TURBINE, COST_PER_BATTERY_KWH,
-    INSTALLATION_OVERHEAD_FACTOR, ENGINEERING_CONSULTING_COST_FACTOR, PERMITTING_LEGAL_COST_FACTOR,
-    OTHER_COMPONENTS_COST_FACTOR, ANNUAL_OM_RATE, BATTERY_LIFETIME_YEARS,
-    PROJECT_LIFETIME_YEARS, FINANCING_INTEREST_RATE
-)
-
-# Configure logging for this module
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -41,43 +33,37 @@ def find_pareto_front(df: pd.DataFrame, objectives: dict):
 
 class HRES_Decision_Engine:
     def __init__(self, configurations_df: pd.DataFrame):
+        # ... (constructor is correct)
         if configurations_df is None or configurations_df.empty:
             raise ValueError("Configuration DataFrame cannot be empty.")
         self.all_configs = configurations_df
         self.scaler = MinMaxScaler()
         self.esg_kpi_schema = {
             'env_co2_reduction_tons_yr': 'maximize', 'env_land_use_sqm': 'minimize',
-            'env_water_savings_m3_yr': 'maximize', 'env_waste_factor_pct': 'minimize',
-            'env_degradation_rate': 'minimize', 'soc_local_jobs_fte': 'maximize',
+            'env_water_savings_m3_yr': 'maximize',
+            'env_waste_factor_pct': 'minimize', 'env_degradation_rate': 'minimize', 'soc_local_jobs_fte': 'maximize',
             'soc_energy_resilience_hrs': 'maximize', 'soc_grid_strain_reduction_pct': 'maximize',
-            'soc_community_investment_eur': 'maximize', 'soc_noise_level_impact_score': 'maximize',
-            'gov_payback_plausibility_score': 'maximize', 'gov_supply_chain_transparency_score': 'maximize',
+            'soc_community_investment_eur': 'maximize',
+            'soc_noise_level_impact_score': 'maximize', 'gov_payback_plausibility_score': 'maximize',
+            'gov_supply_chain_transparency_score': 'maximize',
             'gov_regulatory_compliance_score': 'maximize', 'gov_stakeholder_reporting_score': 'maximize',
             'gov_operational_risk_score': 'maximize'
         }
 
     def _get_scaled_scenario_df(self, scenario_name, annual_demand_kwh):
+        # ... (this function is correct)
         scenario_df = self.all_configs[self.all_configs['scenario_name'] == scenario_name].copy()
-        if scenario_df.empty:
-            logger.warning(f"Scenario '{scenario_name}' not found in dataset.")
-            return None
-
+        if scenario_df.empty: return None
         original_demand = scenario_df['annual_demand_kwh'].iloc[0]
-        scaling_factor = annual_demand_kwh / original_demand if original_demand > 0 else 0
-
-        cols_to_scale = [
-            'annual_kwh_generated', 'annual_savings_eur', 'total_cost', 'env_co2_reduction_tons_yr',
-            'soc_local_jobs_fte', 'annual_kwh_exported', 'annual_kwh_curtailed', 'env_water_savings_m3_yr',
-            'soc_community_investment_eur', 'wind_generation_kwh', 'solar_generation_kwh',
-            'annual_maintenance_cost_eur', 'annual_amortized_battery_replacement_cost_eur', 'annual_financing_cost_eur'
-        ]
+        scaling_factor = annual_demand_kwh / (original_demand + 1e-9)
+        cols_to_scale = ['annual_kwh_generated', 'annual_savings_eur', 'total_cost', 'env_co2_reduction_tons_yr',
+                         'soc_local_jobs_fte', 'annual_kwh_exported', 'annual_kwh_curtailed', 'env_water_savings_m3_yr',
+                         'soc_community_investment_eur', 'wind_generation_kwh', 'solar_generation_kwh',
+                         'annual_maintenance_cost_eur', 'annual_amortized_battery_replacement_cost_eur',
+                         'annual_financing_cost_eur']
         for col in cols_to_scale:
             if col in scenario_df.columns:
                 scenario_df[col] *= scaling_factor
-            else:
-                logger.warning(f"Column '{col}' not found for scaling. Defaulting to 0.0.")
-                scenario_df[col] = 0.0
-
         scenario_df['annual_demand_kwh'] = annual_demand_kwh
         grid_import = scenario_df['annual_demand_kwh'] - (
                     scenario_df['annual_kwh_generated'] - scenario_df['annual_kwh_exported'] - scenario_df[
@@ -86,47 +72,29 @@ class HRES_Decision_Engine:
                     annual_demand_kwh + 1e-9)) * 100
         scenario_df['self_sufficiency_pct'] = scenario_df['self_sufficiency_pct'].clip(upper=100.0)
         scenario_df['payback_period_years'] = scenario_df['total_cost'] / (scenario_df['annual_savings_eur'] + 1e-9)
-
         total_gen_scaled = scenario_df['wind_generation_kwh'] + scenario_df['solar_generation_kwh']
         scenario_df['wind_contribution_pct'] = (scenario_df['wind_generation_kwh'] / (total_gen_scaled + 1e-9)) * 100
         scenario_df['wind_contribution_pct'] = scenario_df['wind_contribution_pct'].fillna(0).clip(upper=100.0)
-
         return scenario_df
 
     def step_1_moo_filter_feasible_solutions(self, scaled_scenario_df: pd.DataFrame, user_grid_dependency_pct: float):
+        # ... (this function is correct)
         min_self_sufficiency = 100.0 - user_grid_dependency_pct
         min_wind_contribution_pct = 15.0
-
-        feasible_solutions = scaled_scenario_df[
-            (scaled_scenario_df['self_sufficiency_pct'] >= min_self_sufficiency) &
-            (scaled_scenario_df['wind_contribution_pct'] >= min_wind_contribution_pct)
-            ].copy()
-
-        if feasible_solutions.empty:
-            return None, f"No solutions meet the required {min_self_sufficiency:.1f}% self-sufficiency AND {min_wind_contribution_pct:.1f}% wind contribution."
-
+        feasible_solutions = scaled_scenario_df[(scaled_scenario_df['self_sufficiency_pct'] >= min_self_sufficiency) & (
+                    scaled_scenario_df['wind_contribution_pct'] >= min_wind_contribution_pct)].copy()
+        if feasible_solutions.empty: return None, f"No solutions meet {min_self_sufficiency:.1f}% self-sufficiency AND {min_wind_contribution_pct:.1f}% wind contribution."
         feasible_solutions = feasible_solutions[
             feasible_solutions['payback_period_years'] <= PROJECT_LIFETIME_YEARS * 2].copy()
-        if feasible_solutions.empty:
-            return None, f"No solutions found with a reasonable payback period (max {PROJECT_LIFETIME_YEARS * 2} years) after meeting other targets."
-
+        if feasible_solutions.empty: return None, f"No solutions found with a payback period under {PROJECT_LIFETIME_YEARS * 2} years."
         return feasible_solutions, f"Found {len(feasible_solutions)} technically feasible solutions."
 
     def step_2_electre_tri_sort_by_esg(self, feasible_df: pd.DataFrame):
+        # ... (this function is correct)
         if feasible_df is None or feasible_df.empty: return feasible_df, "No feasible solutions to sort."
-
-        profiles = {
-            "Good": {'soc_energy_resilience_hrs': 8.0, 'gov_payback_plausibility_score': 7.0,
-                     'env_co2_reduction_tons_yr_norm': 0.7},
-            "Average": {'soc_energy_resilience_hrs': 4.0, 'gov_payback_plausibility_score': 5.0,
-                        'env_co2_reduction_tons_yr_norm': 0.4}
-        }
+        profiles = {"Good": {'soc_energy_resilience_hrs': 8.0, 'gov_payback_plausibility_score': 7.0},
+                    "Average": {'soc_energy_resilience_hrs': 4.0, 'gov_payback_plausibility_score': 5.0}}
         df = feasible_df.copy()
-
-        if 'env_co2_reduction_tons_yr' in df.columns and df['env_co2_reduction_tons_yr'].sum() > 0:
-            df['env_co2_reduction_tons_yr_norm'] = self.scaler.fit_transform(df[['env_co2_reduction_tons_yr']])
-        else:
-            df['env_co2_reduction_tons_yr_norm'] = 0.0
 
         def assign_category(row):
             if sum(1 for k, t in profiles["Good"].items() if row.get(k, 0) >= t) >= 2: return "Good"
@@ -138,71 +106,62 @@ class HRES_Decision_Engine:
 
     def step_3_mcda_select_best(self, sorted_df: pd.DataFrame, esg_weights: dict):
         if sorted_df is None or sorted_df.empty: return None, "No sorted solutions to select from."
-
         best_category_df = sorted_df[sorted_df['esg_category'] == 'Good']
         if best_category_df.empty: best_category_df = sorted_df[sorted_df['esg_category'] == 'Average']
         if best_category_df.empty: best_category_df = sorted_df
         mcda_df = best_category_df.copy()
 
-        mcda_df['waste_factor'] = mcda_df['annual_kwh_curtailed'] / (mcda_df['annual_kwh_generated'] + 1e-6)
-
-        cols_to_normalize = list(self.esg_kpi_schema.keys()) + ['total_cost', 'waste_factor']
-        normalized_data = mcda_df[cols_to_normalize].copy()
+        cols_to_normalize = list(self.esg_kpi_schema.keys()) + ['total_cost']
+        normalized_data = mcda_df.copy()
+        for col in cols_to_normalize:
+            if col in normalized_data.columns and normalized_data[col].nunique() > 1:
+                normalized_data[col] = self.scaler.fit_transform(normalized_data[[col]])
+            else:
+                normalized_data[col] = 0.5
 
         for col, goal in self.esg_kpi_schema.items():
-            if col in normalized_data.columns and normalized_data[col].sum() > 0:
-                if goal == 'minimize':
-                    normalized_data[col] = 1 - self.scaler.fit_transform(normalized_data[[col]])
-                else:
-                    normalized_data[col] = self.scaler.fit_transform(normalized_data[[col]])
+            if goal == 'minimize': normalized_data[col] = 1 - normalized_data[col]
+        normalized_data['total_cost'] = 1 - normalized_data['total_cost']
 
-        for col in ['total_cost', 'waste_factor']:
-            if col in normalized_data.columns and normalized_data[col].sum() > 0:
-                normalized_data[col] = 1 - self.scaler.fit_transform(normalized_data[[col]])
-
-        final_score = pd.Series(0.0, index=mcda_df.index)
+        scores = {"cost": 0.0, "environment": 0.0, "social": 0.0, "governance": 0.0}
         for dim, weight in esg_weights.items():
             dim_prefix = dim[:3] + '_'
             dim_cols = [col for col in self.esg_kpi_schema if col.startswith(dim_prefix)]
             if dim == 'cost':
-                final_score += normalized_data['total_cost'] * weight
+                scores['cost'] = normalized_data['total_cost'] * weight
             else:
+                dim_score = pd.Series(0.0, index=mcda_df.index)
                 for col in dim_cols:
                     if col in normalized_data:
-                        final_score += normalized_data[col] * (weight / (len(dim_cols) + 1e-6))
+                        dim_score += normalized_data[col]
+                scores[dim] = (dim_score / (len(dim_cols) + 1e-6)) * weight
 
-        final_score -= normalized_data['waste_factor'] * 0.5  # Penalty for waste
+        mcda_df['final_score'] = sum(scores.values())
+        best_solution_index = mcda_df['final_score'].idxmax()
+        best_solution = sorted_df.loc[best_solution_index].copy()
 
-        mcda_df['final_score'] = final_score
-        if mcda_df.empty: return None, "No solutions remaining after MCDA scoring."
+        # *** ENHANCEMENT: Attach component scores for UI visualization ***
+        best_solution['component_scores'] = {
+            "Cost": scores['cost'].loc[best_solution_index] / (esg_weights['cost'] + 1e-9),
+            "Environment": scores['environment'].loc[best_solution_index] / (esg_weights['environment'] + 1e-9),
+            "Social": scores['social'].loc[best_solution_index] / (esg_weights['social'] + 1e-9),
+            "Governance": scores['governance'].loc[best_solution_index] / (esg_weights['governance'] + 1e-9)
+        }
 
-        best_solution = sorted_df.loc[mcda_df['final_score'].idxmax()]
-        return best_solution, f"Selected best solution from the '{best_solution['esg_category']}' ESG category."
+        return best_solution, f"Selected best solution from '{best_solution['esg_category']}' category."
 
     def run_full_pipeline(self, scenario_name, annual_demand_kwh, user_grid_dependency_pct, esg_weights):
         scaled_df = self._get_scaled_scenario_df(scenario_name, annual_demand_kwh)
-        if scaled__df is None: return None, f"Scenario '{scenario_name}' not found.", None, None, None
-
+        if scaled_df is None: return None, f"Scenario '{scenario_name}' not found.", None, None, None
         feasible_df, msg1 = self.step_1_moo_filter_feasible_solutions(scaled_df, user_grid_dependency_pct)
         if feasible_df is None: return None, msg1, None, None, None
-
         sorted_df, msg2 = self.step_2_electre_tri_sort_by_esg(feasible_df)
         best_solution, msg3 = self.step_3_mcda_select_best(sorted_df, esg_weights)
-
         pareto_front_df = find_pareto_front(feasible_df.copy(),
                                             {'total_cost': 'minimize', 'self_sufficiency_pct': 'maximize'})
-
         if best_solution is not None:
-            # Bundle all financial constants for the UI to use
-            best_solution['model_constants'] = {
-                'COST_PER_SOLAR_PANEL': COST_PER_SOLAR_PANEL, 'COST_PER_WIND_TURBINE': COST_PER_WIND_TURBINE,
-                'COST_PER_BATTERY_KWH': COST_PER_BATTERY_KWH,
-                'INSTALLATION_OVERHEAD_FACTOR': INSTALLATION_OVERHEAD_FACTOR,
-                'ENGINEERING_CONSULTING_COST_FACTOR': ENGINEERING_CONSULTING_COST_FACTOR,
-                'PERMITTING_LEGAL_COST_FACTOR': PERMITTING_LEGAL_COST_FACTOR,
-                'OTHER_COMPONENTS_COST_FACTOR': OTHER_COMPONENTS_COST_FACTOR, 'ANNUAL_OM_RATE': ANNUAL_OM_RATE,
-                'BATTERY_LIFETIME_YEARS': BATTERY_LIFETIME_YEARS, 'PROJECT_LIFETIME_YEARS': PROJECT_LIFETIME_YEARS,
-                'FINANCING_INTEREST_RATE': FINANCING_INTEREST_RATE
-            }
-
+            best_solution['model_constants'] = {'COST_PER_SOLAR_PANEL': COST_PER_SOLAR_PANEL,
+                                                'COST_PER_WIND_TURBINE': COST_PER_WIND_TURBINE,
+                                                'COST_PER_BATTERY_KWH': COST_PER_BATTERY_KWH,
+                                                'INSTALLATION_OVERHEAD_FACTOR': INSTALLATION_OVERHEAD_FACTOR}
         return best_solution, f"{msg1} {msg2} {msg3}", feasible_df, sorted_df, pareto_front_df

@@ -29,6 +29,7 @@ ipykernel==6.28.0
 # Testing Framework
 pytest==7.4.4
 pytest-cov==4.1.0     # For checking test coverage
+plotly
 
 # Note: apache-airflow is installed separately in its Dockerfile
 # to use a specific version with constraints for stability.

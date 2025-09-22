@@ -1,5 +1,5 @@
 #!/bin/bash
-# --- File: docker/airflow_entrypoint.sh ---
+# --- File: docker/airflow_entrypoint.sh (Cleaned Version) ---
 
 # Define default values for Airflow connections
 AIRFLOW_CONN_POSTGRES_DEFAULT='postgres://airflow:airflow@hres_postgres:5432/airflow'
@@ -8,7 +8,6 @@ AIRFLOW_CONN_POSTGRES_DEFAULT='postgres://airflow:airflow@hres_postgres:5432/air
 export AIRFLOW_CONN_POSTGRES_DEFAULT
 
 # Wait for the database to be available
-# This uses the 'nc' (netcat) command installed in the Dockerfile
 echo "Waiting for PostgreSQL..."
 while ! nc -z hres_postgres 5432; do
   sleep 0.1
@@ -29,6 +28,5 @@ airflow users create \
     --role Admin \
     --email shameem.hossain@email.com || true
 
-# The 'exec' command is important to replace the script process with the Airflow process,
-# allowing it to receive signals correctly.
+# The 'exec' command replaces the script process with the Airflow process
 exec "$@"

@@ -1,4 +1,4 @@
-# --- File: docker/Dockerfile.mlflow (Corrected Version) ---
+# --- File: docker/Dockerfile.mlflow (Cleaned Version) ---
 FROM python:3.9-slim
 
 RUN groupadd -r mlflow && useradd -r -g mlflow mlflow
@@ -14,23 +14,4 @@ RUN chmod +x /mlflow_startup.sh && chown mlflow:mlflow /mlflow_startup.sh
 
 USER mlflow
 EXPOSE 5000
-ENTRYPOINT ["/mlflow_startup.sh"]```
-
----
-
-### **Action 3: (Still Recommended) Clean up `docker-compose.yml`**
-
-You are still seeing the warning: `the attribute 'version' is obsolete`. To make your logs perfectly clean, please open `docker/docker-compose.yml` and **delete the first line**: `version: '3.8'`.
-
----
-
-### **Next Steps**
-
-You are now ready to try again. From your PowerShell terminal in the `docker/` directory:
-
-```powershell
-# This command is optional but good practice after a failed build
-docker builder prune
-
-# This will now use the corrected Dockerfiles
-docker compose up --build -d
+ENTRYPOINT ["/mlflow_startup.sh"]

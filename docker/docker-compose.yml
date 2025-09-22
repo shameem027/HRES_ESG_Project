@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Final Corrected Version) ---
+# --- File: docker/docker-compose.yml (Definitive Final Version) ---
 services:
   hres_postgres:
     image: postgres:13
@@ -10,7 +10,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_db_data:/var/lib/postgresql/data
-    networks:
+    networks: # Explicitly attach to the network
       - hres_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -32,7 +32,7 @@ services:
       - mlflow_artifacts:/mlflow/artifacts
     ports:
       - "5000:5000"
-    networks:
+    networks: # Explicitly attach to the network
       - hres_network
     depends_on:
       hres_postgres:
@@ -43,12 +43,12 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: webserver
+    command: airflow webserver
     ports:
       - "8080:8080"
     volumes:
       - airflow_logs:/opt/airflow/logs
-    networks:
+    networks: # Explicitly attach to the network
       - hres_network
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
@@ -65,10 +65,10 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: scheduler
+    command: airflow scheduler
     volumes:
       - airflow_logs:/opt/airflow/logs
-    networks:
+    networks: # Explicitly attach to the network
       - hres_network
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
@@ -85,7 +85,7 @@ services:
       dockerfile: docker/Dockerfile.api
     ports:
       - "8081:8080"
-    networks:
+    networks: # Explicitly attach to the network
       - hres_network
     environment:
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
@@ -108,7 +108,7 @@ services:
     volumes:
       - ../src:/home/jovyan/src
       - ../notebooks:/home/jovyan/notebooks
-    networks:
+    networks: # Explicitly attach to the network
       - hres_network
 
   hres_ui:
@@ -118,16 +118,18 @@ services:
       dockerfile: docker/Dockerfile.ui
     ports:
       - "8501:8501"
-    networks:
+    networks: # Explicitly attach to the network
       - hres_network
     environment:
       - API_BASE_URL=http://hres_api:8080
 
+# Define the top-level network
+networks:
+  hres_network:
+    driver: bridge
+
+# Define the top-level volumes
 volumes:
   postgres_db_data:
   mlflow_artifacts:
   airflow_logs:
-
-networks:
-  hres_network:
-    driver: bridge
