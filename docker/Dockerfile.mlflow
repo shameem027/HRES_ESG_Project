@@ -27,11 +27,14 @@ USER 1001
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install mlflow psycopg2-binary "sqlalchemy<2.0" alembic
 
-# Copy the startup script as a binary file
+# Copy the startup script
 COPY docker/mlflow_startup.sh .
 
-# Make it executable (this should work now since we copied it as binary)
+# Make it executable
 RUN chmod +x mlflow_startup.sh
 
+# Switch back to root for the CMD instruction
+USER root
+
 # Default command will be overridden by docker-compose to run the startup script
-CMD ["tail", "-f", "/dev/null"]
+CMD ["/mlflow_app/mlflow_startup.sh"]
