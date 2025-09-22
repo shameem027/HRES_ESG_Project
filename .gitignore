@@ -18,7 +18,7 @@ postgres_db_data/
 mlflow_artifacts/
 
 # Local environment variables - ONLY ignore the .env file inside the 'docker' folder
-docker/.env
+# docker/.env
 
 # Airflow/Application Logs - CRITICAL FIX for "Invalid argument" error
 logs/
