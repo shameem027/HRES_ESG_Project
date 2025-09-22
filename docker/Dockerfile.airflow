@@ -1,31 +1,51 @@
-# --- File: docker/Dockerfile.airflow (Definitive Final Version - Bulletproof User Management) ---
-# Based on official Airflow image
-FROM apache/airflow:2.7.3-python3.9
+# --- File: docker/Dockerfile.airflow ---
+FROM python:3.9-slim
 
-# Ensure we are root for system package installations
-USER root
-WORKDIR /opt/airflow
+# Set environment variables for Airflow
+ENV AIRFLOW_HOME=/opt/airflow
+ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies that psycopg2-binary might need
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Define Airflow version and constraints file using build arguments for reproducibility
+ARG AIRFLOW_VERSION=2.8.1
+ARG CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.9.txt"
 
-# Copy requirements.txt to the working directory. This COPY runs as 'root'.
-COPY requirements.txt .
+# Create a non-root user for better security
+RUN groupadd -r airflow && useradd -r -g airflow -d ${AIRFLOW_HOME} -s /bin/bash airflow
 
-# Switch to the non-root 'airflow' user for security during container runtime.
-# This user already exists in the base Airflow image with UID/GID 50000.
+# Install system dependencies required for certain Python packages
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential libpq-dev freetds-dev libssl-dev libsasl2-dev curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file first to leverage Docker's build cache
+COPY ../requirements.txt /requirements.txt
+
+# Install Python dependencies, including Apache Airflow with specified constraints
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir apache-airflow==${AIRFLOW_VERSION} --constraint "${CONSTRAINT_URL}" && \
+    pip install --no-cache-dir -r /requirements.txt
+
+# Create directories, copy project files, and set correct permissions
+COPY . ${AIRFLOW_HOME}
+RUN mkdir -p ${AIRFLOW_HOME}/dags ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/plugins ${AIRFLOW_HOME}/src && \
+    cp -r ./src/* ${AIRFLOW_HOME}/src/ && \
+    cp -r ./airflow/dags/* ${AIRFLOW_HOME}/dags/ && \
+    chown -R airflow:airflow ${AIRFLOW_HOME}
+
+# Set the working directory
+WORKDIR ${AIRFLOW_HOME}
+
+# Expose the Airflow webserver port
+EXPOSE 8080
+
+# Switch to the non-root user
 USER airflow
 
-# Install Python dependencies as the 'airflow' user.
-# This RUN command now executes as 'airflow' and will use its default site-packages.
-RUN pip install --no-cache-dir -r requirements.txt
+# The command to run in docker-compose will handle DB initialization and starting services.
+# This CMD is a fallback if run standalone.
+CMD ["bash", "-c", "airflow db init && airflow standalone"]
 
-# Copy DAGs and src code (mounted via docker-compose).
-# These COPY commands also run as 'airflow'.
-COPY airflow/dags ./dags
-COPY src ./src
-
-# Expose ports for webserver (8080)
-EXPOSE 8080
+# Add a healthcheck to verify the webserver is responsive
+HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
+  CMD [ "curl", "--fail", "http://localhost:8080/health" ]

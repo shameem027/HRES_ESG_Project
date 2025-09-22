@@ -1,46 +1,30 @@
 #!/bin/bash
-# --- File: docker/mlflow_startup.sh (Definitive Final Version - Robust MLflow Startup Script) ---
-set -e # Exit immediately if a command exits with a non-zero status
+# --- File: docker/mlflow_startup.sh ---
 
-echo "Starting MLflow robust startup sequence within custom image..."
+# This script acts as a wrapper to wait for the database to be available
+# before starting the MLflow tracking server.
 
-# Export environment variables for MLflow to ensure they are recognized
-export MLFLOW_TRACKING_URI="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}"
-export MLFLOW_BACKEND_STORE_URI=${MLFLOW_TRACKING_URI}
-export MLFLOW_DEFAULT_ARTIFACT_ROOT="/mlflow/artifacts"
+# Environment variables that should be passed from docker-compose.yml
+# DB_HOST: The hostname of the database service (e.g., hres_postgres)
+# DB_PORT: The port of the database service (e.g., 5432)
+# BACKEND_STORE_URI: The full SQLAlchemy connection string for the backend store
+# ARTIFACT_ROOT: The path to the artifact store
 
-echo "MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}"
-echo "MLFLOW_BACKEND_STORE_URI: ${MLFLOW_BACKEND_STORE_URI}"
-echo "MLFLOW_DEFAULT_ARTIFACT_ROOT: ${MLFLOW_DEFAULT_ARTIFACT_ROOT}"
-
-echo "Waiting for Postgres to be fully ready before MLflow DB upgrade..."
-until pg_isready -h hres_postgres -p 5432 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"; do
-  echo "Postgres not yet ready. Sleeping for 2 seconds..."
-  sleep 2
+echo "Verifying database connection..."
+# Loop until the database is ready to accept connections
+# nc (netcat) is a simple utility to test TCP connections
+until nc -z -v -w30 $DB_HOST $DB_PORT
+do
+  echo "Waiting for database connection at ${DB_HOST}:${DB_PORT}..."
+  # wait for 5 seconds before check again
+  sleep 5
 done
-echo "Postgres is ready. Running MLflow DB upgrade."
+echo "Database is up and running!"
 
-upgrade_db() {
-    mlflow db upgrade ${MLFLOW_BACKEND_STORE_URI}
-}
-
-MAX_RETRIES=10
-RETRY_COUNT=0
-until upgrade_db || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
-    echo "MLflow DB upgrade failed, retrying in 5 seconds... ($((MAX_RETRIES-RETRY_COUNT)) retries left)"
-    sleep 5
-    RETRY_COUNT=$((RETRY_COUNT+1))
-done
-
-if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-    echo "MLflow DB upgrade failed after $MAX_RETRIES attempts. Exiting."
-    exit 1
-fi
-
-echo "MLflow DB upgrade complete. Starting MLflow server."
-
-exec mlflow server \
-    --backend-store-uri "${MLFLOW_BACKEND_STORE_URI}" \
-    --default-artifact-root "${MLFLOW_DEFAULT_ARTIFACT_ROOT}" \
+echo "Starting MLflow Server..."
+# Execute the MLflow server command
+mlflow server \
     --host 0.0.0.0 \
-    --port 5000
+    --port 5000 \
+    --backend-store-uri ${BACKEND_STORE_URI} \
+    --default-artifact-root ${ARTIFACT_ROOT}

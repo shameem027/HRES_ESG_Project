@@ -1,41 +1,41 @@
-# --- File: docker/Dockerfile.api (Definitive Final Version - Bulletproof User Management) ---
+# --- File: docker/Dockerfile.api ---
+# Stage 1: Builder stage to compile and install dependencies
+FROM python:3.9-slim as builder
+
+WORKDIR /install
+
+# Install system build tools
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python requirements into a separate prefix
+COPY ../requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Stage 2: Final production image
 FROM python:3.9-slim
 
-# 1. Install system dependencies as root
-USER root
+# Create a non-root user and group for running the application
+RUN groupadd -r apiuser && useradd --no-log-init -r -g apiuser apiuser
+
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Copy installed packages from the builder stage
+COPY --from=builder /install /usr/local
 
-# 2. Create a writable directory for Python packages for the non-root user
-#    and set PIP_TARGET to this directory.
-ENV PIP_TARGET=/usr/local/lib/python3.9/site-packages/user_packages
-RUN mkdir -p ${PIP_TARGET} && chown 1000:1000 ${PIP_TARGET}
+# Copy application source code
+COPY ./api/ /app/api/
+COPY ./src/ /app/src/
 
-# 3. Copy requirements.txt (still as root for this COPY)
-COPY requirements.txt .
+# Set correct ownership for the app directory
+RUN chown -R apiuser:apiuser /app
 
-# 4. Switch to an arbitrary non-root user for security (e.g., 1000, a common default)
-USER 1000
+# Switch to the non-root user
+USER apiuser
 
-# 5. This makes Python imports reliable for the non-root user by adding PIP_TARGET to PYTHONPATH
-ENV PYTHONPATH=/app:${PIP_TARGET}
-
-# Standard Flask environment variables
-ENV FLASK_APP=api.recommender_api
-ENV FLASK_RUN_HOST=0.0.0.0
-ENV FLASK_RUN_PORT=8080
-
-# 6. Install Python dependencies (now as USER 1000 into PIP_TARGET)
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 7. Copy the application's Python packages (now as USER 1000)
-COPY ./src /app/src
-COPY ./api /app/api
-
+# Expose the port the app runs on
 EXPOSE 8080
-CMD ["flask", "run"]
+
+# Run the application with Gunicorn, a production-ready WSGI server
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "api.recommender_api:app"]

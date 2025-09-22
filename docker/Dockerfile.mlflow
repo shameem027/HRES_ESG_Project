@@ -1,40 +1,21 @@
-# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Bulletproof User Management) ---
-FROM python:3.11-slim
+# --- File: docker/Dockerfile.mlflow ---
+FROM python:3.9-slim
 
-# 1. Install system dependencies as root
-USER root
-WORKDIR /mlflow_app
+# Create a non-root user for security
+RUN groupadd -r mlflow && useradd -r -g mlflow mlflow
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Install MLflow and the PostgreSQL driver
+RUN pip install --no-cache-dir mlflow psycopg2-binary
 
-# 2. Create writable directories for MLflow artifacts and DB backend for the non-root user
-#    and set PIP_TARGET to this directory.
-ENV PIP_TARGET=/usr/local/lib/python3.11/site-packages/user_packages
-RUN mkdir -p ${PIP_TARGET} /mlflow/artifacts /mlflow/db \
-    && chown 1001:1001 ${PIP_TARGET} /mlflow/artifacts /mlflow/db
+# Copy the startup script and make it executable
+COPY ./docker/mlflow_startup.sh /mlflow_startup.sh
+RUN chmod +x /mlflow_startup.sh && chown mlflow:mlflow /mlflow_startup.sh
 
-# 3. Copy requirements.txt (still as root for this COPY)
-COPY requirements.txt .
+# Switch to the non-root user
+USER mlflow
 
-# 4. Switch to an arbitrary non-root user for security
-USER 1001
+# Expose the MLflow tracking server port
+EXPOSE 5000
 
-# 5. Install necessary Python packages (now as USER 1001 into PIP_TARGET)
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install mlflow psycopg2-binary "sqlalchemy<2.0" alembic
-
-# Copy the startup script
-COPY docker/mlflow_startup.sh .
-
-# Make it executable
-RUN chmod +x mlflow_startup.sh
-
-# Switch back to root for the CMD instruction
-USER root
-
-# Default command will be overridden by docker-compose to run the startup script
-CMD ["/mlflow_app/mlflow_startup.sh"]
+# Use the startup script as the entrypoint to ensure DB is ready
+ENTRYPOINT ["/mlflow_startup.sh"]
