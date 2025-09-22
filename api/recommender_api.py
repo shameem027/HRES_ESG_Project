@@ -15,21 +15,21 @@ logger = logging.getLogger(__name__)
 
 
 # --- Pydantic Models for Input Validation ---
-class EsgWeights(BaseModel):  # ... as before
+class EsgWeights(BaseModel):
     environment: float = Field(..., ge=0, le=1)
     social: float = Field(..., ge=0, le=1)
     governance: float = Field(..., ge=0, le=1)
     cost: float = Field(..., ge=0, le=1)
 
 
-class RecommendRequest(BaseModel):  # ... as before
+class RecommendRequest(BaseModel):
     scenario_name: str
     annual_demand_kwh: int = Field(..., gt=0)
     user_grid_dependency_pct: int = Field(..., ge=0, le=100)
     esg_weights: EsgWeights
 
 
-class MlPredictRequest(BaseModel):  # ... as before
+class MlPredictRequest(BaseModel):
     scenario_name: str
     num_solar_panels: int = Field(..., ge=0)
     num_wind_turbines: int = Field(..., ge=0)
@@ -81,7 +81,7 @@ AI Consultant Response (with Markdown table):
 
 # --- End Prompts ---
 
-def load_resources():  # ... as before
+def load_resources():
     global decision_engine, ml_models, scenario_encoders, azure_client
     try:
         from src.MCDA_model import HRES_Decision_Engine
@@ -117,13 +117,13 @@ with app.app_context(): load_resources()
 
 
 @app.route('/health', methods=['GET'])
-def health_check():  # ... as before
+def health_check():
     return jsonify({"status": "healthy", "decision_engine_loaded": decision_engine is not None,
                     "llm_client_loaded": azure_client is not None, "ml_models_loaded": len(ml_models) > 0})
 
 
 @app.route('/recommend', methods=['POST'])
-def recommend():  # ... as before
+def recommend():
     if not decision_engine: return jsonify({"error": "Decision Engine not operational."}), 503
     try:
         req_data = RecommendRequest.model_validate(request.get_json())
@@ -131,7 +131,9 @@ def recommend():  # ... as before
             req_data.scenario_name, req_data.annual_demand_kwh, req_data.user_grid_dependency_pct,
             req_data.esg_weights.model_dump())
         if best_solution is not None:
-            return jsonify({"status": status, "recommendation": best_solution.to_dict(), "intermediate_results": {
+            # Convert potential numpy types to native Python types for JSON serialization
+            recommendation_dict = json.loads(pd.Series(best_solution).to_json())
+            return jsonify({"status": status, "recommendation": recommendation_dict, "intermediate_results": {
                 "pareto_front": pareto_df.to_dict(orient='records') if pareto_df is not None else []}}), 200
         else:
             return jsonify({"status": status, "recommendation": None}), 404
@@ -143,7 +145,7 @@ def recommend():  # ... as before
 
 
 @app.route('/predict_ml', methods=['POST'])
-def predict_ml():  # ... as before
+def predict_ml():
     if not ml_models: return jsonify({"error": "ML models not loaded."}), 503
     try:
         req_data = MlPredictRequest.model_validate(request.get_json())
@@ -165,7 +167,8 @@ def predict_ml():  # ... as before
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    if not azure_client: return jsonify({"error": "AI Advisor is disabled. Check API server logs."}), 503
+    if not azure_client: return jsonify(
+        {"error": "AI Advisor is disabled. API key may be missing or invalid. Check API server logs."}), 503
     user_query = request.json.get('query')
     if not user_query: return jsonify({"error": "Query is missing"}), 400
     try:
@@ -174,6 +177,12 @@ def chat():
                                                                messages=[{"role": "user", "content": intent_prompt}],
                                                                temperature=0.0, response_format={"type": "json_object"})
         parsed_intent = json.loads(intent_response.choices[0].message.content)
+
+        # Normalize weights from LLM just in case they aren't perfect
+        esg_weights = parsed_intent.get('esg_weights', {})
+        weight_sum = sum(esg_weights.values())
+        if weight_sum > 0:
+            parsed_intent['esg_weights'] = {k: v / weight_sum for k, v in esg_weights.items()}
 
         solution, _, _, _, _ = decision_engine.run_full_pipeline(**parsed_intent)
 
@@ -201,4 +210,5 @@ def chat():
         return jsonify({"response": ai_response})
     except Exception as e:
         logger.error(f"Error in /chat endpoint: {e}", exc_info=True)
-        return jsonify({"error": "An internal error occurred while consulting the AI Advisor."}), 500
+        return jsonify({
+                           "error": "An internal error occurred while consulting the AI Advisor. The user query may have been unparseable."}), 500
