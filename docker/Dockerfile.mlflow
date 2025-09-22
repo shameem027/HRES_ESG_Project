@@ -1,21 +1,36 @@
-# --- File: docker/Dockerfile.mlflow ---
+# --- File: docker/Dockerfile.mlflow (Corrected Version) ---
 FROM python:3.9-slim
 
-# Create a non-root user for security
 RUN groupadd -r mlflow && useradd -r -g mlflow mlflow
 
-# Install MLflow and the PostgreSQL driver
+# Add the installation for netcat-openbsd, which is needed by the startup script
+RUN apt-get update && apt-get install -y --no-install-recommends netcat-openbsd && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir mlflow psycopg2-binary
 
-# Copy the startup script and make it executable
 COPY ./docker/mlflow_startup.sh /mlflow_startup.sh
 RUN chmod +x /mlflow_startup.sh && chown mlflow:mlflow /mlflow_startup.sh
 
-# Switch to the non-root user
 USER mlflow
-
-# Expose the MLflow tracking server port
 EXPOSE 5000
+ENTRYPOINT ["/mlflow_startup.sh"]```
 
-# Use the startup script as the entrypoint to ensure DB is ready
-ENTRYPOINT ["/mlflow_startup.sh"]
+---
+
+### **Action 3: (Still Recommended) Clean up `docker-compose.yml`**
+
+You are still seeing the warning: `the attribute 'version' is obsolete`. To make your logs perfectly clean, please open `docker/docker-compose.yml` and **delete the first line**: `version: '3.8'`.
+
+---
+
+### **Next Steps**
+
+You are now ready to try again. From your PowerShell terminal in the `docker/` directory:
+
+```powershell
+# This command is optional but good practice after a failed build
+docker builder prune
+
+# This will now use the corrected Dockerfiles
+docker compose up --build -d
