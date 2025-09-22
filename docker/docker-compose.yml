@@ -3,17 +3,13 @@ services:
   hres_postgres:
     image: postgres:13
     container_name: hres_postgres
-    hostname: hres_postgres
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+    env_file: .env
     volumes:
       - postgres_db_data:/var/lib/postgresql/data
-    networks: # Explicitly attach to the network
+    networks:
       - hres_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGES_USER} -d ${POSTGES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,16 +19,17 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.mlflow
+    env_file: .env
     environment:
       - DB_HOST=hres_postgres
       - DB_PORT=5432
-      - BACKEND_STORE_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
+      - BACKEND_STORE_URI=postgresql://${POSTGES_USER}:${POSTGES_PASSWORD}@hres_postgres:5432/${POSTGES_DB}
       - ARTIFACT_ROOT=file:/mlflow/artifacts
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
     ports:
       - "5000:5000"
-    networks: # Explicitly attach to the network
+    networks:
       - hres_network
     depends_on:
       hres_postgres:
@@ -43,18 +40,15 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: airflow webserver
+    command: webserver
+    env_file: .env
     ports:
       - "8080:8080"
     volumes:
       - airflow_logs:/opt/airflow/logs
-    networks: # Explicitly attach to the network
+    networks:
       - hres_network
     environment:
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
-      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW_EXECUTOR}
-      - AIRFLOW_WWW_USER_USERNAME=${AIRFLOW_WWW_USER_USERNAME}
-      - AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_WWW_USER_PASSWORD}
       - MLFLOW_TRACKING_URI=http://hres_mlflow:5000
     depends_on:
       hres_postgres:
@@ -65,14 +59,13 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: airflow scheduler
+    command: scheduler
+    env_file: .env
     volumes:
       - airflow_logs:/opt/airflow/logs
-    networks: # Explicitly attach to the network
+    networks:
       - hres_network
     environment:
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=${AIRFLOW__DATABASE__SQL_ALCHEMY_CONN}
-      - AIRFLOW__CORE__EXECUTOR=${AIRFLOW_EXECUTOR}
       - MLFLOW_TRACKING_URI=http://hres_mlflow:5000
     depends_on:
       hres_postgres:
@@ -83,15 +76,12 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
+    env_file: .env # <-- CRITICAL FIX FOR AI ADVISOR
     ports:
       - "8081:8080"
-    networks: # Explicitly attach to the network
+    networks:
       - hres_network
     environment:
-      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
-      - OPENAI_API_VERSION=${OPENAI_API_VERSION}
-      - AZURE_DEPLOYMENT_NAME=${AZURE_DEPLOYMENT_NAME}
       - MLFLOW_TRACKING_URI=http://hres_mlflow:5000
     depends_on:
       hres_mlflow:
@@ -108,7 +98,7 @@ services:
     volumes:
       - ../src:/home/jovyan/src
       - ../notebooks:/home/jovyan/notebooks
-    networks: # Explicitly attach to the network
+    networks:
       - hres_network
 
   hres_ui:
@@ -118,17 +108,15 @@ services:
       dockerfile: docker/Dockerfile.ui
     ports:
       - "8501:8501"
-    networks: # Explicitly attach to the network
+    networks:
       - hres_network
     environment:
       - API_BASE_URL=http://hres_api:8080
 
-# Define the top-level network
 networks:
   hres_network:
     driver: bridge
 
-# Define the top-level volumes
 volumes:
   postgres_db_data:
   mlflow_artifacts:
