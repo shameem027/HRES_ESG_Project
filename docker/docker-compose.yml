@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive Final Version - Bulletproof MLflow Script Mount) ---
+# --- File: docker/docker-compose.yml (Definitive Final Version - No MLflow Script Mount) ---
 # Removed 'version: 3.8' as it is obsolete and causes a warning.
 
 services:
@@ -30,15 +30,15 @@ services:
       - "5000:5000"
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
-      # --- CRITICAL FIX: Mount the script to an unambiguous root location ---
-      - ./docker/mlflow_startup.sh:/usr/local/bin/mlflow_startup.sh # Mount as an executable file in /usr/local/bin
+      # --- CRITICAL FIX: Removed the problematic volume mount for mlflow_startup.sh ---
+      # No more - ./docker/mlflow_startup.sh:/usr/local/bin/mlflow_startup.sh
     networks:
       - hres_network
     depends_on:
       postgres:
         condition: service_healthy
-    # --- Execute the script from its new, unambiguous path ---
-    command: ["bash", "/usr/local/bin/mlflow_startup.sh"]
+    # CMD is now handled entirely within the Dockerfile itself
+    # It will execute the script /usr/local/bin/mlflow_startup.sh that is now COPIED INTO THE IMAGE
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 10s

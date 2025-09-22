@@ -1,4 +1,4 @@
-# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Finalized Custom Build) ---
+# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Embed Script) ---
 FROM python:3.11-slim
 
 # 1. Install system dependencies as root
@@ -27,7 +27,11 @@ USER 1001
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install mlflow psycopg2-binary "sqlalchemy<2.0" alembic
 
-EXPOSE 5000
+# --- CRITICAL FIX: Copy and execute startup script *from within the Dockerfile* ---
+# Copy the startup script from the build context into the image
+COPY docker/mlflow_startup.sh /usr/local/bin/mlflow_startup.sh
+# Make it executable inside the image
+RUN chmod +x /usr/local/bin/mlflow_startup.sh
 
-# Default command for the container. The actual startup script will be mounted by docker-compose.
-CMD ["tail", "-f", "/dev/null"]
+# Default command to run the embedded startup script
+CMD ["bash", "/usr/local/bin/mlflow_startup.sh"]
