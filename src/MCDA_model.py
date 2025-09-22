@@ -1,4 +1,4 @@
-# --- File: src/MCDA_model.py (Enhanced for UI Visualizations) ---
+# --- File: src/MCDA_model.py (Enhanced for Rich UI Visualizations) ---
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
@@ -9,6 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# ... (find_pareto_front function remains the same)
 def find_pareto_front(df: pd.DataFrame, objectives: dict):
     df_reset = df.reset_index(drop=True)
     is_pareto = np.ones(df_reset.shape[0], dtype=bool)
@@ -16,15 +17,10 @@ def find_pareto_front(df: pd.DataFrame, objectives: dict):
         if not is_pareto[i]: continue
         for j, other_row in df_reset.iterrows():
             if i == j: continue
-            is_dominated = all(
-                (goal == 'maximize' and other_row[obj] >= row[obj]) or
-                (goal == 'minimize' and other_row[obj] <= row[obj])
-                for obj, goal in objectives.items()
-            ) and any(
-                (goal == 'maximize' and other_row[obj] > row[obj]) or
-                (goal == 'minimize' and other_row[obj] < row[obj])
-                for obj, goal in objectives.items()
-            )
+            is_dominated = all((goal == 'maximize' and other_row[obj] >= row[obj]) or (
+                        goal == 'minimize' and other_row[obj] <= row[obj]) for obj, goal in objectives.items()) and any(
+                (goal == 'maximize' and other_row[obj] > row[obj]) or (goal == 'minimize' and other_row[obj] < row[obj])
+                for obj, goal in objectives.items())
             if is_dominated:
                 is_pareto[i] = False
                 break
@@ -34,21 +30,19 @@ def find_pareto_front(df: pd.DataFrame, objectives: dict):
 class HRES_Decision_Engine:
     def __init__(self, configurations_df: pd.DataFrame):
         # ... (constructor is correct)
-        if configurations_df is None or configurations_df.empty:
-            raise ValueError("Configuration DataFrame cannot be empty.")
+        if configurations_df is None or configurations_df.empty: raise ValueError(
+            "Configuration DataFrame cannot be empty.")
         self.all_configs = configurations_df
         self.scaler = MinMaxScaler()
-        self.esg_kpi_schema = {
-            'env_co2_reduction_tons_yr': 'maximize', 'env_land_use_sqm': 'minimize',
-            'env_water_savings_m3_yr': 'maximize',
-            'env_waste_factor_pct': 'minimize', 'env_degradation_rate': 'minimize', 'soc_local_jobs_fte': 'maximize',
-            'soc_energy_resilience_hrs': 'maximize', 'soc_grid_strain_reduction_pct': 'maximize',
-            'soc_community_investment_eur': 'maximize',
-            'soc_noise_level_impact_score': 'maximize', 'gov_payback_plausibility_score': 'maximize',
-            'gov_supply_chain_transparency_score': 'maximize',
-            'gov_regulatory_compliance_score': 'maximize', 'gov_stakeholder_reporting_score': 'maximize',
-            'gov_operational_risk_score': 'maximize'
-        }
+        self.esg_kpi_schema = {'env_co2_reduction_tons_yr': 'maximize', 'env_land_use_sqm': 'minimize',
+                               'env_water_savings_m3_yr': 'maximize', 'env_waste_factor_pct': 'minimize',
+                               'env_degradation_rate': 'minimize', 'soc_local_jobs_fte': 'maximize',
+                               'soc_energy_resilience_hrs': 'maximize', 'soc_grid_strain_reduction_pct': 'maximize',
+                               'soc_community_investment_eur': 'maximize', 'soc_noise_level_impact_score': 'maximize',
+                               'gov_payback_plausibility_score': 'maximize',
+                               'gov_supply_chain_transparency_score': 'maximize',
+                               'gov_regulatory_compliance_score': 'maximize',
+                               'gov_stakeholder_reporting_score': 'maximize', 'gov_operational_risk_score': 'maximize'}
 
     def _get_scaled_scenario_df(self, scenario_name, annual_demand_kwh):
         # ... (this function is correct)
@@ -62,8 +56,7 @@ class HRES_Decision_Engine:
                          'annual_maintenance_cost_eur', 'annual_amortized_battery_replacement_cost_eur',
                          'annual_financing_cost_eur']
         for col in cols_to_scale:
-            if col in scenario_df.columns:
-                scenario_df[col] *= scaling_factor
+            if col in scenario_df.columns: scenario_df[col] *= scaling_factor
         scenario_df['annual_demand_kwh'] = annual_demand_kwh
         grid_import = scenario_df['annual_demand_kwh'] - (
                     scenario_df['annual_kwh_generated'] - scenario_df['annual_kwh_exported'] - scenario_df[
@@ -124,29 +117,35 @@ class HRES_Decision_Engine:
         normalized_data['total_cost'] = 1 - normalized_data['total_cost']
 
         scores = {"cost": 0.0, "environment": 0.0, "social": 0.0, "governance": 0.0}
+        unweighted_scores = {"cost": 0.0, "environment": 0.0, "social": 0.0, "governance": 0.0}
+
         for dim, weight in esg_weights.items():
             dim_prefix = dim[:3] + '_'
             dim_cols = [col for col in self.esg_kpi_schema if col.startswith(dim_prefix)]
             if dim == 'cost':
                 scores['cost'] = normalized_data['total_cost'] * weight
+                unweighted_scores['cost'] = normalized_data['total_cost']
             else:
                 dim_score = pd.Series(0.0, index=mcda_df.index)
                 for col in dim_cols:
                     if col in normalized_data:
                         dim_score += normalized_data[col]
-                scores[dim] = (dim_score / (len(dim_cols) + 1e-6)) * weight
+                unweighted_scores[dim] = (dim_score / (len(dim_cols) + 1e-6))
+                scores[dim] = unweighted_scores[dim] * weight
 
         mcda_df['final_score'] = sum(scores.values())
         best_solution_index = mcda_df['final_score'].idxmax()
         best_solution = sorted_df.loc[best_solution_index].copy()
 
-        # *** ENHANCEMENT: Attach component scores for UI visualization ***
-        best_solution['component_scores'] = {
-            "Cost": scores['cost'].loc[best_solution_index] / (esg_weights['cost'] + 1e-9),
-            "Environment": scores['environment'].loc[best_solution_index] / (esg_weights['environment'] + 1e-9),
-            "Social": scores['social'].loc[best_solution_index] / (esg_weights['social'] + 1e-9),
-            "Governance": scores['governance'].loc[best_solution_index] / (esg_weights['governance'] + 1e-9)
+        # *** ENHANCEMENT: Attach detailed scores and KPIs for the UI ***
+        best_solution['normalized_scores'] = {
+            "Cost": unweighted_scores['cost'].loc[best_solution_index],
+            "Environment": unweighted_scores['environment'].loc[best_solution_index],
+            "Social": unweighted_scores['social'].loc[best_solution_index],
+            "Governance": unweighted_scores['governance'].loc[best_solution_index]
         }
+        kpi_cols = list(self.esg_kpi_schema.keys())
+        best_solution['raw_kpis'] = best_solution[kpi_cols].to_dict()
 
         return best_solution, f"Selected best solution from '{best_solution['esg_category']}' category."
 
