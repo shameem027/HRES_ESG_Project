@@ -1,4 +1,4 @@
-# --- File: ui.py (Definitive Final Version with All Fixes) ---
+# --- File: ui.py (Definitive Final Version) ---
 import streamlit as st
 import requests
 import pandas as pd
@@ -52,20 +52,21 @@ tab_recommender, tab_predictor, tab_advisor, tab_about = st.tabs(
 
 with tab_recommender:
     st.header("Optimal Solution Dashboard")
+    # ** CRITICAL UI FIX: API call is INSIDE the form submission block **
     if submitted:
         payload = {"scenario_name": scenario_name, "annual_demand_kwh": annual_demand_kwh,
                    "user_grid_dependency_pct": user_grid_dependency_pct, "esg_weights": weights}
         try:
-            with st.spinner("Analyzing thousands of configurations..."):
+            with st.spinner("Analyzing thousands of configurations... This may take a moment."):
                 response = requests.post(f"{API_BASE_URL}/recommend", json=payload)
             if response.status_code == 200:
                 st.session_state.recommendation = response.json()
             else:
-                st.session_state.recommendation = None;
+                st.session_state.recommendation = None
                 st.warning(
                     f"**No Solution Found.** API reported: *'{response.json().get('status', 'N/A')}'*. Please try relaxing the constraints in the sidebar.")
         except requests.exceptions.RequestException as e:
-            st.session_state.recommendation = None;
+            st.session_state.recommendation = None
             st.error(f"Connection to the backend API failed. Please ensure all Docker services are running. Error: {e}")
 
     if 'recommendation' in st.session_state and st.session_state.recommendation:
@@ -183,14 +184,38 @@ with tab_advisor:
     st.header("🤖 Chat with the AI Advisor")
     st.markdown(
         "Use natural language to describe your needs. The advisor will process your request and provide a summary.")
-
-    # Initialize chat history
-    if "messages" not in st.session_state: st.session_state.messages = [
-        {"role": "assistant", "content": "How can I help you configure your system today?"}]
-
-    # Display chat messages from history
+    st.markdown("**Sample Prompts:**");
+    c1, c2, c3 = st.columns(3)
+    if c1.button(
+        "Cheap solution for a hospital?"): st.session_state.prompt_text = "I need a cheap solution for a hospital"
+    if c2.button(
+        "Eco-friendly university campus?"): st.session_state.prompt_text = "Find a very eco-friendly system for a university campus"
+    if c3.button(
+        "Off-grid data center?"): st.session_state.prompt_text = "I need an off-grid data center with high resilience"
+    if "messages" not in st.session_state: st.session_state.messages = [{"role": "assistant",
+                                                                         "content": "How can I help you configure your system today? You can type a query below or use a sample prompt above."}]
     for message in st.session_state.messages:
         with st.chat_message(message["role"]): st.markdown(message["content"])
+
+    # Use st.chat_input, the standard for chat interfaces
+    if prompt := st.chat_input("Your request:", key="chat_input_main"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            with st.spinner("Consulting the AI Advisor..."):
+                try:
+                    response = requests.post(f"{API_BASE_URL}/chat", json={"query": prompt})
+                    if response.status_code == 200:
+                        assistant_response = response.json()['response']
+                    else:
+                        assistant_response = f"Error: {response.json().get('error', 'Failed to get a response.')}"
+                except requests.exceptions.RequestException as e:
+                    assistant_response = f"Error: Could not connect to the API. {e}"
+            message_placeholder.markdown(assistant_response)
+        st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+        st.rerun()
 
 with tab_about:
     st.header("About This Project");
@@ -205,23 +230,3 @@ with tab_about:
     st.subheader("III. Fulfillment of Mini-Project Requirements");
     st.markdown(
         "- **[✔] Business Scope:** The problem, goal, and customer value are clearly articulated above.\n- **[✔] ML/AI Scope:**\n    - A synthetic dataset is generated on-demand.\n    - An ML model (Random Forest) is trained on engineered features.\n    - An LLM prompt is extensively engineered for the AI Advisor.\n- **[✔] MLOps Scope (MLflow):**\n    - Experiments, runs, and artifacts are all tracked in MLflow.\n    - The MLflow Model Registry is used for model versioning and deployment.\n- **[✔] Automation (Airflow Bonus):** A complete Airflow pipeline automates the data and model update process.\n- **[✔] Production Scenario (Bonus):**\n    - The entire application is deployed in Docker containers.\n    - This interactive, multi-tab Streamlit dashboard serves as a \"lovable\" UI for the functional API.")
-
-# --- DEFINITIVE CHAT INPUT FIX ---
-# Place the st.chat_input at the main level of the script, outside all containers.
-if prompt := st.chat_input("Ask the AI Advisor..."):
-    # Add user message to session state
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    # Call the API to get the assistant's response
-    try:
-        with st.spinner("Consulting the AI Advisor..."):
-            response = requests.post(f"{API_BASE_URL}/chat", json={"query": prompt})
-            if response.status_code == 200:
-                assistant_response = response.json()['response']
-            else:
-                assistant_response = f"Error: {response.json().get('error', 'Failed to get a response from the AI Advisor.')}"
-    except requests.exceptions.RequestException as e:
-        assistant_response = f"Error: Could not connect to the backend API. Details: {e}"
-    # Add assistant response to session state
-    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-    # Rerun the app to immediately display the new messages
-    st.rerun()
