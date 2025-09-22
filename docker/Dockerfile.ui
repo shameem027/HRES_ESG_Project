@@ -1,19 +1,24 @@
-# --- File: docker/Dockerfile.ui (Definitive Final Version - Bulletproof apt-get) ---
+# --- File: docker/Dockerfile.ui (Definitive Final Version - Bulletproof User Management) ---
 FROM python:3.11-slim
 
+# 1. Install system dependencies as root
+USER root
 WORKDIR /app
 
-# Install system dependencies (e.g., libpq-dev if streamlit/plotly deps need it)
-# CRITICAL FIX: Explicitly run apt-get as root using su -c
-RUN su -c "apt-get update && apt-get install -y --no-install-recommends libpq-dev && rm -rf /var/lib/apt/lists/*"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-USER 1002 # Switch to another arbitrary non-root user for security
-
-# Copy requirements.txt and install dependencies
+# 2. Copy requirements.txt (still as root)
 COPY requirements.txt .
+
+# 3. Switch to another arbitrary non-root user for security
+USER 1002
+
+# 4. Install dependencies (now as USER 1002)
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the Streamlit UI script and logo
+# 5. Copy the Streamlit UI script and logo (now as USER 1002)
 COPY ui.py .
 COPY logo.png .
 

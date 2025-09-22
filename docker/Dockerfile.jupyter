@@ -1,26 +1,28 @@
-# --- File: docker/Dockerfile.jupyter (Definitive Final Version - Bulletproof apt-get) ---
+# --- File: docker/Dockerfile.jupyter (Definitive Final Version - Bulletproof User Management) ---
 # Start from the base Jupyter SciPy Notebook image
 FROM jupyter/scipy-notebook:latest
 
 # The jupyter/scipy-notebook image defaults to 'jovyan' user.
-# We need to explicitly run apt-get as root using 'su -c'.
-WORKDIR /home/jovyan
+# We need to switch to root for system package installation.
 
-# Install system dependencies that psycopg2-binary might need
-# CRITICAL FIX: Explicitly run apt-get as root using su -c
-RUN su -c "apt-get update && apt-get install -y --no-install-recommends libpq-dev && rm -rf /var/lib/apt/lists/*"
+# 1. Install system dependencies as root
+USER root
+WORKDIR /home/jovyan # Still set WORKDIR for clarity
 
-# Switch back to the default Jupyter user (jovyan), which is defined by $NB_USER and $NB_UID
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Copy requirements.txt (still as root)
+COPY requirements.txt .
+
+# 3. Switch back to the default Jupyter user (jovyan), which is defined by $NB_USER.
 USER $NB_USER
 
-# Copy requirements.txt to a temporary location for installation
-COPY requirements.txt /tmp/requirements.txt
+# 4. Install dependencies (now as $NB_USER)
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install dependencies and clean up
-RUN pip install --no-cache-dir -r /tmp/requirements.txt \
-    && rm /tmp/requirements.txt
-
-# Create a notebooks directory (if it doesn't exist, though base image usually has one)
+# 5. Copy notebooks directory (implicitly created by base image, owned by jovyan)
 RUN mkdir -p /home/jovyan/notebooks
 
 # Expose the Jupyter port
