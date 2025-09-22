@@ -1,14 +1,14 @@
-# --- File: docker/Dockerfile.airflow (Definitive Final Version - Syntax Fixed) ---
+# --- File: docker/Dockerfile.airflow (Definitive Final Version - User Creation Fixed) ---
 # Based on official Airflow image
 FROM apache/airflow:2.7.3-python3.9
 
-ARG AIRFLOW_UID=50000
+# ARG AIRFLOW_UID=50000 # Keep ARG for reference, but the base image already handles the user
 
-# Set Airflow user ID. Required by some Docker environments.
-USER root
-RUN groupadd -r airflow --gid=${AIRFLOW_UID} \
-    && useradd -r -g airflow -m -s /bin/bash --uid=${AIRFLOW_UID} airflow
-USER airflow
+# The base Airflow image already creates the 'airflow' user and group with UID 50000.
+# Attempting to re-create it causes an error.
+# We just need to switch to that user.
+
+USER airflow # Switch to the existing 'airflow' user
 
 WORKDIR /opt/airflow
 
@@ -17,7 +17,8 @@ WORKDIR /opt/airflow
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy DAGs and src code (mounted via docker-compose)
+# Copy DAGs and src code (mounted via docker-compose) - these are mount points
+# The actual content is mounted from the host via docker-compose volumes
 COPY airflow/dags ./dags
 COPY src ./src
 
