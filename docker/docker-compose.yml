@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive Final Version - Robust MLflow Startup Script) ---
+# --- File: docker/docker-compose.yml (Definitive Final Version - Custom MLflow Build) ---
 # Removed 'version: 3.8' as it is obsolete and causes a warning.
 
 services:
@@ -21,26 +21,29 @@ services:
     restart: unless-stopped
 
   mlflow:
-    image: mlflow/mlflow:2.9.2
+    # --- CRITICAL FIX: Building custom MLflow image from simple Python base ---
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mlflow # <--- Now building custom image
     container_name: hres_mlflow
     env_file: .env
     ports:
       - "5000:5000"
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
-      - ./docker/mlflow_startup.sh:/mlflow_server/mlflow_startup.sh # <--- NEW: Mount the startup script
+      - ./docker/mlflow_startup.sh:/mlflow_app/mlflow_startup.sh # <--- Mount startup script
     networks:
       - hres_network
     depends_on:
       postgres:
-        condition: service_healthy # MLflow must wait for Postgres to be fully healthy
-    command: ["bash", "/mlflow_server/mlflow_startup.sh"] # <--- NEW: Execute the startup script
+        condition: service_healthy
+    command: ["bash", "/mlflow_app/mlflow_startup.sh"] # <--- Execute the startup script
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 90s # <--- Increased start_period further for robust startup
+      start_period: 90s # Increased start_period further for robust startup
     restart: unless-stopped
 
   airflow-init:
