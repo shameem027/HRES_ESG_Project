@@ -1,30 +1,31 @@
-# --- File: docker/Dockerfile.airflow (Definitive Final Version - Chown Fixed) ---
+# --- File: docker/Dockerfile.airflow (Definitive Final Version - Airflow Compliant Pip Install) ---
 # Based on official Airflow image
 FROM apache/airflow:2.7.3-python3.9
 
 # The base Airflow image is initially run as 'root'.
-# We perform setup (copy requirements, install deps) as root,
-# then switch to the 'airflow' user for runtime.
+# We need to explicitly switch to the 'airflow' user for pip installation,
+# as per Airflow's best practices to avoid 'pip as root' warnings/errors.
 
-WORKDIR /opt/airflow # This WORKDIR is initially as root
+WORKDIR /opt/airflow # Set working directory. This WORKDIR is initially as root.
 
-# Copy requirements.txt to a temporary location for installation
-COPY requirements.txt /tmp/requirements.txt
+# Copy requirements.txt to a location accessible by 'airflow'. This COPY command runs as 'root'.
+# We'll copy it to the current WORKDIR.
+COPY requirements.txt .
 
-# Install dependencies as root and then remove the temporary file.
-# This RUN command executes as 'root'.
-# FIX: Change ownership of the requirements file to the 'airflow' user.
-#      Only specify the user, as the group will default to the primary group 'airflow'.
-RUN chown airflow /tmp/requirements.txt \
-    && pip install --no-cache-dir -r /tmp/requirements.txt \
-    && rm /tmp/requirements.txt
-
-# Switch to the non-root 'airflow' user for security during container runtime.
-# This user already exists in the base Airflow image.
+# Switch to the non-root 'airflow' user.
+# This user already exists in the base Airflow image with UID/GID 50000.
 USER airflow
 
-# Copy DAGs and src code (mounted via docker-compose) - these are volume mount points from host
-# These COPY commands will now execute as 'airflow' user.
+# Install dependencies as the 'airflow' user.
+# This RUN command now executes as 'airflow' and will satisfy Airflow's requirement.
+# The 'requirements.txt' file is already in the WORKDIR and owned by 'airflow'
+# because it was copied by 'root' while 'airflow' was the WORKDIR's default owner,
+# or because the base image ensures ownership.
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy DAGs and src code (mounted via docker-compose).
+# These COPY commands also execute as 'airflow' and will have correct permissions.
+# These are the local paths that docker-compose will mount into the container.
 COPY airflow/dags ./dags
 COPY src ./src
 
