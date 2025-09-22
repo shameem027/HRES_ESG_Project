@@ -1,4 +1,4 @@
-# --- File: docker/Dockerfile.mlflow (Definitive Final Version - No Script Copy in Dockerfile) ---
+# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Cleaned and Simplified) ---
 FROM python:3.11-slim
 
 # 1. Install system dependencies as root
@@ -25,8 +25,8 @@ USER 1001
 
 # 5. Install necessary Python packages (now as USER 1001 into PIP_TARGET)
 RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install mlflow psycopg2-binary "sqlalchemy<2.0" alembic # Ensure these are installed
+    && pip install mlflow psycopg2-binary "sqlalchemy<2.0" alembic
 
 # Default command will be overridden by docker-compose to run the startup script
-# The script itself is mounted from docker-compose.yml
-CMD ["tail", "-f", "/dev/null"] # Keep container alive while docker-compose overrides command
+# Keep container alive if docker-compose doesn't override CMD
+CMD ["tail", "-f", "/dev/null"]
