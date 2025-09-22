@@ -36,7 +36,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["bash", "/mlflow_app/mlflow_startup.sh"]
+    # CRITICAL CHANGE: Remove 'command' from here. It will be run manually for debug.
+    # command: ["bash", "/mlflow_app/mlflow_startup.sh"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 10s

@@ -1,4 +1,4 @@
-# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Cleaned and Simplified) ---
+# --- File: docker/Dockerfile.mlflow (Definitive Final Version - MANUAL DEBUG CMD) ---
 FROM python:3.11-slim
 
 # 1. Install system dependencies as root
@@ -27,6 +27,12 @@ USER 1001
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install mlflow psycopg2-binary "sqlalchemy<2.0" alembic
 
-# Default command will be overridden by docker-compose to run the startup script
-# Keep container alive if docker-compose doesn't override CMD
-CMD ["tail", "-f", "/dev/null"]
+# Copy the startup script (now as USER 1001)
+COPY docker/mlflow_startup.sh .
+RUN chmod +x mlflow_startup.sh
+
+EXPOSE 5000
+
+# CRITICAL CHANGE: Change CMD to bash for manual debugging
+# This container will now start and wait, allowing you to manually execute commands.
+CMD ["bash"]
