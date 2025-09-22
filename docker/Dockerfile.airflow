@@ -1,4 +1,4 @@
-# --- File: docker/Dockerfile.airflow (Corrected Version 2) ---
+# --- File: docker/Dockerfile.airflow (Final Corrected Version) ---
 FROM python:3.9-slim
 
 ENV AIRFLOW_HOME=/opt/airflow
@@ -9,7 +9,6 @@ ARG CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints
 
 RUN groupadd -r airflow && useradd -r -g airflow -d ${AIRFLOW_HOME} -s /bin/bash airflow
 
-# Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential libpq-dev freetds-dev libssl-dev libsasl2-dev curl netcat-openbsd \
@@ -23,13 +22,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 COPY ../src ${AIRFLOW_HOME}/src
 COPY ../airflow/dags ${AIRFLOW_HOME}/dags
+COPY ./docker/airflow_entrypoint.sh /airflow_entrypoint.sh
 
-RUN mkdir -p ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/plugins && \
+RUN chmod +x /airflow_entrypoint.sh && \
+    mkdir -p ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/plugins && \
     chown -R airflow:airflow ${AIRFLOW_HOME}
 
 WORKDIR ${AIRFLOW_HOME}
 EXPOSE 8080
 USER airflow
-CMD ["bash", "-c", "airflow db init && airflow standalone"]
+
+ENTRYPOINT ["/airflow_entrypoint.sh"]
+
 HEALTHCHECK --interval=30s --timeout=30s --start-period=30s --retries=3 \
   CMD [ "curl", "--fail", "http://localhost:8080/health" ]
