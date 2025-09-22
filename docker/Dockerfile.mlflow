@@ -1,4 +1,4 @@
-# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Robust Startup) ---
+# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Syntax Fixed) ---
 FROM python:3.11-slim # Using 3.11 for potentially newer mlflow features
 
 WORKDIR /mlflow_server
