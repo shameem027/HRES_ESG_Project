@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive Final Version - MLflow Startup Fixed) ---
+# --- File: docker/docker-compose.yml (Definitive Final Version - Official MLflow Image) ---
 # Removed 'version: 3.8' as it is obsolete and causes a warning.
 
 services:
@@ -21,25 +21,39 @@ services:
     restart: unless-stopped
 
   mlflow:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.mlflow
+    # --- CRITICAL FIX: Using official MLflow image directly ---
+    image: mlflow/mlflow:2.9.2 # Using a specific, stable version of the official MLflow image
     container_name: hres_mlflow
     env_file: .env
     ports:
       - "5000:5000"
     volumes:
-      - mlflow_artifacts:/mlflow/artifacts
-      - ./docker/start-mlflow.sh:/mlflow_server/start-mlflow.sh # Mount the startup script
+      - mlflow_artifacts:/mlflow/artifacts # Persistent storage for artifacts
     networks:
       - hres_network
     depends_on:
       postgres:
         condition: service_healthy # MLflow must wait for Postgres to be fully healthy
-    # CMD is now handled by the Dockerfile which points to start-mlflow.sh
-    healthcheck:
+    # --- COMMAND now includes DB upgrade and server start ---
+    command: >
+      bash -c "
+      echo 'Waiting for Postgres to be fully ready before MLflow DB upgrade...' &&
+      until pg_isready -h hres_postgres -p 5432 -U ${POSTGRES_USER} -d ${POSTGRES_DB}; do
+        echo 'Postgres not yet ready. Sleeping for 2 seconds...' &&
+        sleep 2;
+      done &&
+      echo 'Postgres is ready. Running MLflow DB upgrade.' &&
+      mlflow db upgrade postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB} || { echo 'MLflow DB upgrade failed!'; exit 1; } &&
+      echo 'MLflow DB upgrade complete. Starting MLflow server.' &&
+      exec mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+      "
+    healthcheck: # Healthcheck for MLflow
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 10s
+      interval: 10s # Check every 10 seconds after start_period
       timeout: 5s
       retries: 5
       start_period: 60s # Increased start_period to allow DB upgrade and server start
@@ -83,7 +97,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 30s # Airflow webserver can also take some time
     command: ["airflow", "webserver"]
     restart: unless-stopped
 
