@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive Final Version - MLflow Image Fixed) ---
+# --- File: docker/docker-compose.yml (Definitive Final Version - Robust MLflow Startup Script) ---
 # Removed 'version: 3.8' as it is obsolete and causes a warning.
 
 services:
@@ -13,7 +13,7 @@ services:
     networks:
       - hres_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"] # Localhost because it's checking from *inside* the Postgres container
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,41 +21,26 @@ services:
     restart: unless-stopped
 
   mlflow:
-    # --- CRITICAL FIX: Using correct official MLflow image from GitHub Container Registry ---
-    image: ghcr.io/mlflow/mlflow:v2.9.2 # Correct image reference
+    image: mlflow/mlflow:2.9.2
     container_name: hres_mlflow
     env_file: .env
     ports:
       - "5000:5000"
     volumes:
-      - mlflow_artifacts:/mlflow/artifacts # Persistent storage for artifacts
+      - mlflow_artifacts:/mlflow/artifacts
+      - ./docker/mlflow_startup.sh:/mlflow_server/mlflow_startup.sh # <--- NEW: Mount the startup script
     networks:
       - hres_network
     depends_on:
       postgres:
         condition: service_healthy # MLflow must wait for Postgres to be fully healthy
-    command: >
-      bash -c "
-      echo 'Waiting for Postgres to be fully ready before MLflow DB upgrade...' &&
-      until pg_isready -h hres_postgres -p 5432 -U ${POSTGRES_USER} -d ${POSTGRES_DB}; do
-        echo 'Postgres not yet ready. Sleeping for 2 seconds...' &&
-        sleep 2;
-      done &&
-      echo 'Postgres is ready. Running MLflow DB upgrade.' &&
-      mlflow db upgrade postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB} || { echo 'MLflow DB upgrade failed!'; exit 1; } &&
-      echo 'MLflow DB upgrade complete. Starting MLflow server.' &&
-      exec mlflow server
-      --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
-      --default-artifact-root /mlflow/artifacts
-      --host 0.0.0.0
-      --port 5000
-      "
-    healthcheck: # Healthcheck for MLflow
+    command: ["bash", "/mlflow_server/mlflow_startup.sh"] # <--- NEW: Execute the startup script
+    healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 90s # <--- Increased start_period further for robust startup
     restart: unless-stopped
 
   airflow-init:
