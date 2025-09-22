@@ -1,26 +1,28 @@
-# --- File: docker/Dockerfile.airflow (Definitive Final Version - User Creation Fixed) ---
+# --- File: docker/Dockerfile.airflow (Definitive Final Version - User Context Fixed) ---
 # Based on official Airflow image
 FROM apache/airflow:2.7.3-python3.9
 
-# ARG AIRFLOW_UID=50000 # Keep ARG for reference, but the base image already handles the user
-
-# The base Airflow image already creates the 'airflow' user and group with UID 50000.
-# Attempting to re-create it causes an error.
-# We just need to switch to that user.
-
-USER airflow # Switch to the existing 'airflow' user
+# The base Airflow image is initially run as 'root'.
+# We will perform package installations and file copying as root,
+# then switch to the 'airflow' user for runtime security.
 
 WORKDIR /opt/airflow
 
-# Copy requirements.txt and install dependencies
-# Ensure requirements.txt is in the root build context
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy requirements.txt to a temporary location within the container for installation
+COPY requirements.txt /tmp/requirements.txt
+
+# Install dependencies as root (this RUN command executes as root by default for this base image)
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt # Clean up the temporary requirements file after installation
 
 # Copy DAGs and src code (mounted via docker-compose) - these are mount points
-# The actual content is mounted from the host via docker-compose volumes
+# These COPY commands also execute as root.
 COPY airflow/dags ./dags
 COPY src ./src
+
+# Switch to the non-root 'airflow' user for security and consistency during runtime
+# This user already exists in the base Airflow image.
+USER airflow
 
 # Expose ports for webserver (8080)
 EXPOSE 8080
