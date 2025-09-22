@@ -1,5 +1,28 @@
+# --- File: docker/Dockerfile.jupyter (Definitive Final Version - Pg_config Fix) ---
+# Start from the base Jupyter SciPy Notebook image
 FROM jupyter/scipy-notebook:latest
-USER root
+
+# Install system dependencies that psycopg2-binary might need
+USER root # Temporarily switch to root for apt-get
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+USER $NB_UID # Switch back to the default Jupyter user (jovyan)
+
+WORKDIR /home/jovyan
+
+# Copy requirements.txt to a temporary location for installation
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
-USER jovyan
+
+# Install dependencies and clean up
+# This RUN command will execute as the jovyan user by default.
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
+
+# Create a notebooks directory (if it doesn't exist, though base image usually has one)
+RUN mkdir -p /home/jovyan/notebooks
+
+# Expose the Jupyter port
+EXPOSE 8888
+
+# The start command is in docker-compose.yml

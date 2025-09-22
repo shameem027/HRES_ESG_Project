@@ -1,13 +1,15 @@
-# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Simple Python Base) ---
+# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Pg_config Fix) ---
 FROM python:3.11-slim
 
 WORKDIR /mlflow_app
 
 # Install system dependencies needed for psycopg2-binary
+USER root # Temporarily switch to root for apt-get
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
+USER nobody # Switch to a non-root user for security (or create a specific mlflow user)
 
 # Copy requirements.txt and install necessary Python packages
 COPY requirements.txt .
@@ -16,8 +18,13 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 # Create persistent directories for MLflow
 RUN mkdir -p /mlflow/artifacts
-RUN mkdir -p /mlflow/db # For backend store if SQLite or other local DB is chosen, though we use Postgres
+RUN mkdir -p /mlflow/db
 
 EXPOSE 5000
 
+# Copy and make executable the startup script
+COPY docker/mlflow_startup.sh .
+RUN chmod +x mlflow_startup.sh
+
 # Default command will be overridden by docker-compose to run the startup script
+CMD ["./mlflow_startup.sh"]
