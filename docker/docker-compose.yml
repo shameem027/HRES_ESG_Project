@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive Final Version - Version Tag Removed) ---
+# --- File: docker/docker-compose.yml (Definitive Final Version - MLflow Healthcheck Fixed) ---
 # Removed 'version: 3.8' as it is obsolete and causes a warning.
 
 services:
@@ -40,12 +40,12 @@ services:
       --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
       --default-artifact-root /mlflow/artifacts
       --host 0.0.0.0"
-    healthcheck:
+    healthcheck: # Healthcheck for MLflow
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
+      interval: 10s # Check every 10 seconds after start_period
+      timeout: 5s
+      retries: 5
+      start_period: 45s # <--- CRITICAL FIX: Increased start_period for MLflow
     restart: unless-stopped
 
   airflow-init:
@@ -59,7 +59,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["bash", "-c", "airflow db migrate && airflow users create --username ${AIRFLOW_WWW_USER_USERNAME} --password ${AIRFLOW_WWW_USER_PASSWORD} --firstname Airflow --lastname User --role Admin --email airflow@example.com || true"] # Added || true to prevent init failure if user exists
+    command: ["bash", "-c", "airflow db migrate && airflow users create --username ${AIRFLOW_WWW_USER_USERNAME} --password ${AIRFLOW_WWW_USER_PASSWORD} --firstname Airflow --lastname User --role Admin --email airflow@example.com || true"]
     restart: "no"
 
   airflow-webserver:
@@ -86,7 +86,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 30s # Airflow webserver can also take some time
     command: ["airflow", "webserver"]
     restart: unless-stopped
 
@@ -122,14 +122,14 @@ services:
     networks:
       - hres_network
     depends_on:
-      mlflow:
+      mlflow: # API needs MLflow for model loading
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 15s
       timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 30s # API might also need a bit more time
     restart: unless-stopped
 
   ui:
