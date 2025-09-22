@@ -9,7 +9,7 @@ services:
     networks:
       - hres_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGES_USER} -d ${POSTGES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,7 +23,7 @@ services:
     environment:
       - DB_HOST=hres_postgres
       - DB_PORT=5432
-      - BACKEND_STORE_URI=postgresql://${POSTGES_USER}:${POSTGES_PASSWORD}@hres_postgres:5432/${POSTGES_DB}
+      - BACKEND_STORE_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
       - ARTIFACT_ROOT=file:/mlflow/artifacts
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
