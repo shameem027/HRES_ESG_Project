@@ -30,20 +30,20 @@ services:
       - "5000:5000"
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
-      - ./docker/mlflow_startup.sh:/mlflow_app/mlflow_startup.sh
+      # --- CRITICAL FIX: Explicitly mount the script file for execution ---
+      - ./docker/mlflow_startup.sh:/mlflow_app/mlflow_startup.sh # Mounts the local script file
     networks:
       - hres_network
     depends_on:
       postgres:
         condition: service_healthy
-    # CRITICAL CHANGE: Remove 'command' from here. It will be run manually for debug.
-    # command: ["bash", "/mlflow_app/mlflow_startup.sh"]
+    command: ["bash", "/mlflow_app/mlflow_startup.sh"] # Explicitly execute the mounted script
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 90s
+      start_period: 90s # Increased start_period for robust startup
     restart: unless-stopped
 
   airflow-init:
