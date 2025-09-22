@@ -1,8 +1,7 @@
-# --- File: docker/docker-compose.yml (Definitive Final Version - With Airflow Integration) ---
-version: '3.8' # Retaining version for clarity, though it's often implicit now
+# --- File: docker/docker-compose.yml (Definitive Final Version - Version Tag Removed) ---
+# Removed 'version: 3.8' as it is obsolete and causes a warning.
 
 services:
-  # --- DATABASE SERVICE for MLflow & Airflow Metadata ---
   postgres:
     image: postgres:13
     container_name: hres_postgres
@@ -18,10 +17,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 5s # Give Postgres a moment to start
+      start_period: 5s
     restart: unless-stopped
 
-  # --- MLFLOW SERVICE for Experiment Tracking ---
   mlflow:
     build:
       context: ..
@@ -42,7 +40,7 @@ services:
       --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
       --default-artifact-root /mlflow/artifacts
       --host 0.0.0.0"
-    healthcheck: # Added healthcheck for MLflow
+    healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
@@ -50,12 +48,10 @@ services:
       start_period: 15s
     restart: unless-stopped
 
-  # --- AIRFLOW DATABASE INITIALIZATION (Run Once) ---
-  # This service runs once to initialize Airflow's database, then exits.
   airflow-init:
     build:
       context: ..
-      dockerfile: docker/Dockerfile.airflow # A new Dockerfile for Airflow
+      dockerfile: docker/Dockerfile.airflow
     container_name: hres_airflow_init
     env_file: .env
     networks:
@@ -63,11 +59,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["bash", "-c", "airflow db migrate && airflow users create --username ${AIRFLOW_WWW_USER_USERNAME} --password ${AIRFLOW_WWW_USER_PASSWORD} --firstname Airflow --lastname User --role Admin --email airflow@example.com"]
-    # We do not restart this service as it's a one-off initialization.
-    restart: "no" # Ensure it doesn't restart continuously
+    command: ["bash", "-c", "airflow db migrate && airflow users create --username ${AIRFLOW_WWW_USER_USERNAME} --password ${AIRFLOW_WWW_USER_PASSWORD} --firstname Airflow --lastname User --role Admin --email airflow@example.com || true"] # Added || true to prevent init failure if user exists
+    restart: "no"
 
-  # --- AIRFLOW WEBSERVER ---
   airflow-webserver:
     build:
       context: ..
@@ -75,28 +69,27 @@ services:
     container_name: hres_airflow_webserver
     env_file: .env
     ports:
-      - "8080:8080" # Airflow UI uses 8080
+      - "8080:8080"
     volumes:
       - ../airflow/dags:/opt/airflow/dags
-      - ../src:/opt/airflow/src # Mount src for DAGs and ML model
-      - ../requirements.txt:/opt/airflow/requirements.txt # Ensure Airflow has project deps
+      - ../src:/opt/airflow/src
+      - ../requirements.txt:/opt/airflow/requirements.txt
     networks:
       - hres_network
     depends_on:
-      airflow-init: # Wait for DB to be initialized
+      airflow-init:
         condition: service_completed_successfully
-      mlflow: # Airflow might interact with MLflow
+      mlflow:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl --silent --fail http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 20s # Give webserver time to start
+      start_period: 20s
     command: ["airflow", "webserver"]
     restart: unless-stopped
 
-  # --- AIRFLOW SCHEDULER ---
   airflow-scheduler:
     build:
       context: ..
@@ -111,14 +104,13 @@ services:
       - hres_network
     depends_on:
       airflow-webserver:
-        condition: service_healthy # Depend on webserver being up
+        condition: service_healthy
     command: ["airflow", "scheduler"]
     restart: unless-stopped
 
-  # --- API SERVICE (Flask + HRES Decision Engine + ML Prediction) ---
   api:
     build:
-      context: .. # Builds from the project root (Course_Project1/)
+      context: ..
       dockerfile: docker/Dockerfile.api
     container_name: hres_api
     env_file: .env
@@ -126,21 +118,20 @@ services:
       - ../src:/app/src
       - ../api:/app/api
     ports:
-      - "8081:8080" # Changed API to use host port 8081 to avoid conflict with Airflow webserver 8080
+      - "8081:8080"
     networks:
       - hres_network
-    depends_on: # API needs MLflow for model loading
+    depends_on:
       mlflow:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"] # API's internal port is 8080
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 15s
       timeout: 10s
       retries: 5
       start_period: 20s
     restart: unless-stopped
 
-  # --- UI SERVICE (Streamlit Dashboard) ---
   ui:
     build:
       context: ..
@@ -155,10 +146,9 @@ services:
       - hres_network
     depends_on:
       api:
-        condition: service_healthy # UI depends on our custom API
+        condition: service_healthy
     restart: unless-stopped
 
-  # --- JUPYTER SERVICE for Data Science & Experimentation ---
   jupyter:
     build:
       context: ..
@@ -169,7 +159,7 @@ services:
     volumes:
       - ../src:/home/jovyan/src
       - ../notebooks:/home/jovyan/notebooks
-      - ../requirements.txt:/home/jovyan/requirements.txt # Ensure Jupyter has project deps
+      - ../requirements.txt:/home/jovyan/requirements.txt
     networks:
       - hres_network
     restart: unless-stopped
