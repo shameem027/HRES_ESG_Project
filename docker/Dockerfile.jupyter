@@ -1,33 +1,33 @@
-# --- File: docker/Dockerfile.jupyter (Definitive Final Version - Explicit PIP_TARGET) ---
+# --- File: docker/Dockerfile.jupyter (Definitive Final Version - Bulletproof User Management) ---
 # Start from the base Jupyter SciPy Notebook image
 FROM jupyter/scipy-notebook:latest
 
 # The jupyter/scipy-notebook image defaults to 'jovyan' user (defined by $NB_USER).
-# We need to switch to root for system package installation.
+
+# 1. Install system dependencies as root
 USER root
 WORKDIR /home/jovyan # Still set WORKDIR for clarity
 
-# Install system dependencies that psycopg2-binary might need
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a writable directory for Python packages for non-root user
-# Jupyter's image uses Conda. We install into Conda's site-packages.
-ENV PIP_TARGET=/opt/conda/lib/python3.11/site-packages # Adjust if your python version is different
+# 2. Create a writable directory for Python packages for the non-root user
+#    and set PIP_TARGET to this directory.
+# CRITICAL FIX: Ensure no comments are on the same line as ENV for strict Docker parser
+ENV PIP_TARGET=/opt/conda/lib/python3.11/site-packages/user_packages
 RUN mkdir -p ${PIP_TARGET} && chown ${NB_UID}:${NB_GID} ${PIP_TARGET}
 
-# Switch back to the default Jupyter user (jovyan), which is defined by $NB_USER.
+# 3. Copy requirements.txt (still as root for this COPY)
+COPY requirements.txt .
+
+# 4. Switch back to the default Jupyter user (jovyan), which is defined by $NB_USER.
 USER $NB_USER
 
-# Copy requirements.txt to a temporary location for installation
-COPY requirements.txt /tmp/requirements.txt
+# 5. Install dependencies (now as $NB_USER into PIP_TARGET)
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install dependencies and clean up (now as $NB_USER)
-RUN pip install --no-cache-dir -r /tmp/requirements.txt \
-    && rm /tmp/requirements.txt
-
-# Create a notebooks directory (if it doesn't exist, though base image usually has one)
+# 6. Create a notebooks directory (implicitly created by base image, owned by jovyan)
 RUN mkdir -p /home/jovyan/notebooks
 
 # Expose the Jupyter port

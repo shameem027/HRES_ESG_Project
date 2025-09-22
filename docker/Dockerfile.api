@@ -1,38 +1,39 @@
-# --- File: docker/Dockerfile.api (Definitive Final Version - Explicit PIP_TARGET) ---
+# --- File: docker/Dockerfile.api (Definitive Final Version - Bulletproof User Management) ---
 FROM python:3.9-slim
 
-# Ensure we are root for system package installations
+# 1. Install system dependencies as root
 USER root
 WORKDIR /app
 
-# Install system dependencies (curl and libpq-dev for postgres connection)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a writable directory for Python packages for non-root user
-# and set PIP_TARGET to this directory.
-ENV PIP_TARGET=/usr/local/lib/python3.9/site-packages
+# 2. Create a writable directory for Python packages for the non-root user
+#    and set PIP_TARGET to this directory.
+ENV PIP_TARGET=/usr/local/lib/python3.9/site-packages/user_packages
 RUN mkdir -p ${PIP_TARGET} && chown 1000:1000 ${PIP_TARGET}
 
-# Switch to an arbitrary non-root user for security (e.g., 1000, a common default)
+# 3. Copy requirements.txt (still as root for this COPY)
+COPY requirements.txt .
+
+# 4. Switch to an arbitrary non-root user for security (e.g., 1000, a common default)
 USER 1000
 
-# This makes Python imports reliable for the non-root user
-ENV PYTHONPATH=/app:${PIP_TARGET} # Add PIP_TARGET to PYTHONPATH
+# 5. This makes Python imports reliable for the non-root user by adding PIP_TARGET to PYTHONPATH
+ENV PYTHONPATH=/app:${PIP_TARGET}
 
 # Standard Flask environment variables
 ENV FLASK_APP=api.recommender_api
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=8080
 
-# This command relies on requirements.txt being in the project root.
-COPY requirements.txt .
+# 6. Install Python dependencies (now as USER 1000 into PIP_TARGET)
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application's Python packages
+# 7. Copy the application's Python packages (now as USER 1000)
 COPY ./src /app/src
 COPY ./api /app/api
 

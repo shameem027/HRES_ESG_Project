@@ -1,4 +1,4 @@
-# --- File: docker/Dockerfile.airflow (Definitive Final Version - Robust Permissions) ---
+# --- File: docker/Dockerfile.airflow (Definitive Final Version - Bulletproof User Management) ---
 # Based on official Airflow image
 FROM apache/airflow:2.7.3-python3.9
 
@@ -14,19 +14,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements.txt to the working directory. This COPY runs as 'root'.
 COPY requirements.txt .
 
-# Install Python dependencies as root. This RUN command executes as 'root'.
-# Airflow's warning "You are running pip as root" is a runtime warning,
-# installing dependencies as root during the build is standard practice.
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy DAGs and src code (mounted via docker-compose).
-# These COPY commands also run as 'root'.
-COPY airflow/dags ./dags
-COPY src ./src
-
 # Switch to the non-root 'airflow' user for security during container runtime.
 # This user already exists in the base Airflow image with UID/GID 50000.
 USER airflow
+
+# Install Python dependencies as the 'airflow' user.
+# This RUN command now executes as 'airflow' and will use its default site-packages.
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy DAGs and src code (mounted via docker-compose).
+# These COPY commands also run as 'airflow'.
+COPY airflow/dags ./dags
+COPY src ./src
 
 # Expose ports for webserver (8080)
 EXPOSE 8080

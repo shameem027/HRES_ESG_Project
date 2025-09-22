@@ -116,7 +116,6 @@ with tab1:
             st.image("logo.png", width=100)
         st.title("Project Controls")
 
-        st.header("1. Scenario Definition")
         scenario_options = {
             "🏢 Small Office": ("Small_Office", 250000), "🎓 University Campus": ("University_Campus", 3000000),
             "🏥 Hospital": ("Hospital", 1500000), "🏭 Industrial Facility": ("Industrial_Facility", 5000000),
