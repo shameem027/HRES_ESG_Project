@@ -1,4 +1,11 @@
 # --- File: docker/Dockerfile.mlflow (Definitive Final Version - Embed Script) ---
+# ... other instructions ...
+COPY docker/mlflow_startup.sh .
+USER root
+RUN chmod +x mlflow_startup.sh
+USER 1001
+# ... rest of the Dockerfile ...
+
 FROM python:3.11-slim
 
 # 1. Install system dependencies as root
