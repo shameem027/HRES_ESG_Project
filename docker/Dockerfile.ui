@@ -1,24 +1,27 @@
-# --- File: docker/Dockerfile.ui (Definitive Final Version - Bulletproof User Management) ---
+# --- File: docker/Dockerfile.ui (Definitive Final Version - Explicit PIP_TARGET) ---
 FROM python:3.11-slim
 
-# 1. Install system dependencies as root
+# Ensure we are root for system package installations
 USER root
 WORKDIR /app
 
+# Install system dependencies (e.g., libpq-dev if streamlit/plotly deps need it)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Copy requirements.txt (still as root)
-COPY requirements.txt .
+# Create a writable directory for Python packages for non-root user
+ENV PIP_TARGET=/usr/local/lib/python3.11/site-packages
+RUN mkdir -p ${PIP_TARGET} && chown 1002:1002 ${PIP_TARGET}
 
-# 3. Switch to another arbitrary non-root user for security
+# Switch to another arbitrary non-root user for security
 USER 1002
 
-# 4. Install dependencies (now as USER 1002)
+# Copy requirements.txt and install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copy the Streamlit UI script and logo (now as USER 1002)
+# Copy the Streamlit UI script and logo
 COPY ui.py .
 COPY logo.png .
 

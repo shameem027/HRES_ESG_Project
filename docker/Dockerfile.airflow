@@ -1,33 +1,32 @@
-# --- File: docker/Dockerfile.airflow (Definitive Final Version - Bulletproof User Management) ---
+# --- File: docker/Dockerfile.airflow (Definitive Final Version - Robust Permissions) ---
 # Based on official Airflow image
 FROM apache/airflow:2.7.3-python3.9
 
-# The base Airflow image is initially run as 'root'.
-# We perform all system-level installations and Python dependency installations as root
-# to avoid any permission issues during the build process.
-
-# 1. Install system dependencies as root (default user at this point)
+# Ensure we are root for system package installations
 USER root
 WORKDIR /opt/airflow
 
+# Install system dependencies that psycopg2-binary might need
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Copy requirements.txt (still as root)
+# Copy requirements.txt to the working directory. This COPY runs as 'root'.
 COPY requirements.txt .
 
-# 3. Switch to the non-root 'airflow' user before installing Python dependencies
-#    This user already exists in the base Airflow image with UID/GID 50000.
-USER airflow
-
-# 4. Install Python dependencies as the 'airflow' user.
+# Install Python dependencies as root. This RUN command executes as 'root'.
+# Airflow's warning "You are running pip as root" is a runtime warning,
+# installing dependencies as root during the build is standard practice.
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copy DAGs and src code (mounted via docker-compose).
-#    These COPY commands now execute as 'airflow'.
+# Copy DAGs and src code (mounted via docker-compose).
+# These COPY commands also run as 'root'.
 COPY airflow/dags ./dags
 COPY src ./src
+
+# Switch to the non-root 'airflow' user for security during container runtime.
+# This user already exists in the base Airflow image with UID/GID 50000.
+USER airflow
 
 # Expose ports for webserver (8080)
 EXPOSE 8080
