@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive Final Version - Official MLflow Image) ---
+# --- File: docker/docker-compose.yml (Definitive Final Version - MLflow Image Fixed) ---
 # Removed 'version: 3.8' as it is obsolete and causes a warning.
 
 services:
@@ -21,8 +21,8 @@ services:
     restart: unless-stopped
 
   mlflow:
-    # --- CRITICAL FIX: Using official MLflow image directly ---
-    image: mlflow/mlflow:2.9.2 # Using a specific, stable version of the official MLflow image
+    # --- CRITICAL FIX: Using correct official MLflow image from GitHub Container Registry ---
+    image: ghcr.io/mlflow/mlflow:v2.9.2 # Correct image reference
     container_name: hres_mlflow
     env_file: .env
     ports:
@@ -34,7 +34,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy # MLflow must wait for Postgres to be fully healthy
-    # --- COMMAND now includes DB upgrade and server start ---
     command: >
       bash -c "
       echo 'Waiting for Postgres to be fully ready before MLflow DB upgrade...' &&
@@ -53,10 +52,10 @@ services:
       "
     healthcheck: # Healthcheck for MLflow
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 10s # Check every 10 seconds after start_period
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 60s # Increased start_period to allow DB upgrade and server start
+      start_period: 60s
     restart: unless-stopped
 
   airflow-init:
@@ -70,7 +69,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["bash", "-c", "airflow db migrate && airflow users create --username ${AIRFLOW_WWW_USER_USERNAME} --password ${AIRFLOW_WWW_USER_PASSWORD} --firstname Airflow --lastname User --role Admin --email airflow@example.com || true"] # Added || true to prevent init failure if user exists
+    command: ["bash", "-c", "airflow db migrate && airflow users create --username ${AIRFLOW_WWW_USER_USERNAME} --password ${AIRFLOW_WWW_USER_PASSWORD} --firstname Airflow --lastname User --role Admin --email airflow@example.com || true"]
     restart: "no"
 
   airflow-webserver:
@@ -97,7 +96,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s # Airflow webserver can also take some time
+      start_period: 30s
     command: ["airflow", "webserver"]
     restart: unless-stopped
 
