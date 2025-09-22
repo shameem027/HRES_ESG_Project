@@ -1,4 +1,4 @@
-# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Bulletproof User Management) ---
+# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Bulletproof Permissions for Script) ---
 FROM python:3.11-slim
 
 # 1. Install system dependencies as root
@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
+
+# CRITICAL FIX: Copy and make executable the startup script *as root*
+# This ensures root owns it and can make it executable without permission issues.
+COPY docker/mlflow_startup.sh .
+RUN chmod +x mlflow_startup.sh
 
 # 2. Create writable directories for MLflow artifacts and DB backend for the non-root user
 #    and set PIP_TARGET to this directory.
@@ -25,11 +30,7 @@ USER 1001
 
 # 5. Install necessary Python packages (now as USER 1001 into PIP_TARGET)
 RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install mlflow psycopg2-binary "sqlalchemy<2.0" alembic # Ensure these are installed
-
-# 6. Copy and make executable the startup script (now as USER 1001)
-COPY docker/mlflow_startup.sh .
-RUN chmod +x mlflow_startup.sh
+    && pip install mlflow psycopg2-binary "sqlalchemy<2.0" alembic
 
 # Default command will be overridden by docker-compose to run the startup script
 CMD ["./mlflow_startup.sh"]
