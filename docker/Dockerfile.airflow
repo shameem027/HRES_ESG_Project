@@ -1,28 +1,32 @@
-# --- File: docker/Dockerfile.airflow (Definitive Final Version - User Context Fixed) ---
+# --- File: docker/Dockerfile.airflow (Definitive Final Version - Permission Fixed) ---
 # Based on official Airflow image
 FROM apache/airflow:2.7.3-python3.9
 
 # The base Airflow image is initially run as 'root'.
-# We will perform package installations and file copying as root,
-# then switch to the 'airflow' user for runtime security.
+# We need to explicitly ensure we are root for package installations
+# that might require higher privileges or leave files with root ownership.
+USER root
 
-WORKDIR /opt/airflow
+WORKDIR /opt/airflow # Set working directory as root for these operations
 
-# Copy requirements.txt to a temporary location within the container for installation
+# Copy requirements.txt to a temporary location for installation
+# This COPY command runs as 'root'.
 COPY requirements.txt /tmp/requirements.txt
 
-# Install dependencies as root (this RUN command executes as root by default for this base image)
+# Install dependencies as root and then remove the temporary file.
+# This RUN command executes as 'root' due to the preceding 'USER root'.
+# The '&&' ensures 'rm' only runs if 'pip install' is successful.
 RUN pip install --no-cache-dir -r /tmp/requirements.txt \
-    && rm /tmp/requirements.txt # Clean up the temporary requirements file after installation
+    && rm /tmp/requirements.txt
 
-# Copy DAGs and src code (mounted via docker-compose) - these are mount points
-# These COPY commands also execute as root.
-COPY airflow/dags ./dags
-COPY src ./src
-
-# Switch to the non-root 'airflow' user for security and consistency during runtime
+# Switch back to the non-root 'airflow' user for security during container runtime.
 # This user already exists in the base Airflow image.
 USER airflow
+
+# Copy DAGs and src code (mounted via docker-compose) - these are volume mount points from host
+# These COPY commands run as 'airflow' after the USER switch.
+COPY airflow/dags ./dags
+COPY src ./src
 
 # Expose ports for webserver (8080)
 EXPOSE 8080
