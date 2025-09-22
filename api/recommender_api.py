@@ -56,7 +56,7 @@ except Exception as e:
 # -------------------- ML Model Loading --------------------
 ml_models = {}
 scenario_encoders = {}
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://hres_mlflow:5000")  # Ensure MLflow URI is set
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://hres_mlflow:5000")  # Use hres_mlflow service name
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 # Load latest ML models for prediction targets

@@ -1,15 +1,13 @@
-# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Pg_config Fix) ---
+# --- File: docker/Dockerfile.mlflow (Definitive Final Version - Bulletproof apt-get) ---
 FROM python:3.11-slim
 
 WORKDIR /mlflow_app
 
-# Install system dependencies needed for psycopg2-binary
-USER root # Temporarily switch to root for apt-get
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-USER nobody # Switch to a non-root user for security (or create a specific mlflow user)
+# Install system dependencies needed for psycopg2-binary and curl
+# CRITICAL FIX: Explicitly run apt-get as root using su -c
+RUN su -c "apt-get update && apt-get install -y --no-install-recommends build-essential libpq-dev curl && rm -rf /var/lib/apt/lists/*"
+
+USER 1001 # Switch to another arbitrary non-root user for security
 
 # Copy requirements.txt and install necessary Python packages
 COPY requirements.txt .

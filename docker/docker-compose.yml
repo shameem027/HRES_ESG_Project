@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive Final Version - Corrected MLflow Volume Mount) ---
+# --- File: docker/docker-compose.yml (Definitive Final Version - Synchronized) ---
 # Removed 'version: 3.8' as it is obsolete and causes a warning.
 
 services:
@@ -30,14 +30,13 @@ services:
       - "5000:5000"
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
-      # --- CRITICAL FIX: Mount the script as an executable file within the container's WORKDIR ---
-      - ./docker/mlflow_startup.sh:/mlflow_app/mlflow_startup.sh # Mount the script as a FILE
+      - ./docker/mlflow_startup.sh:/mlflow_app/mlflow_startup.sh
     networks:
       - hres_network
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["bash", "/mlflow_app/mlflow_startup.sh"] # Execute the script using its full path
+    command: ["bash", "/mlflow_app/mlflow_startup.sh"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 10s

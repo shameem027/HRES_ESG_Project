@@ -1,23 +1,30 @@
-# --- File: docker/Dockerfile.airflow (Definitive Final Version - Pg_config Fix) ---
+# --- File: docker/Dockerfile.airflow (Definitive Final Version - Bulletproof apt-get) ---
 # Based on official Airflow image
 FROM apache/airflow:2.7.3-python3.9
 
-# Install system dependencies needed for psycopg2-binary
-USER root # Temporarily switch to root for apt-get
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-USER airflow # Switch to the existing 'airflow' user
-
+# The base Airflow image defaults to 'airflow' user.
+# We need to explicitly run apt-get as root using 'su -c'.
 WORKDIR /opt/airflow
 
-# Copy requirements.txt to the working directory.
+# Install system dependencies that psycopg2-binary might need
+# CRITICAL FIX: Explicitly run apt-get as root using su -c
+RUN su -c "apt-get update && apt-get install -y --no-install-recommends libpq-dev && rm -rf /var/lib/apt/lists/*"
+
+# Copy requirements.txt to the working directory. This COPY runs as 'root' implicitly
+# (as the default user for COPY is root if not explicitly set before).
+# However, for pip install, we must ensure airflow user has permissions.
 COPY requirements.txt .
 
-# Install dependencies as the 'airflow' user.
+# Switch to the non-root 'airflow' user.
+# This user already exists in the base Airflow image with UID/GID 50000.
+USER airflow
+
+# Install Python dependencies as 'airflow'.
+# The requirements.txt is already in WORKDIR and accessible by 'airflow'.
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy DAGs and src code (mounted via docker-compose).
+# These COPY commands run as 'airflow'.
 COPY airflow/dags ./dags
 COPY src ./src
 

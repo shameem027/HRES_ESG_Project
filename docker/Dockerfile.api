@@ -1,13 +1,13 @@
-# --- File: docker/Dockerfile.api (Definitive Final Version - Curl Installed) ---
+# --- File: docker/Dockerfile.api (Definitive Final Version - Bulletproof apt-get) ---
 FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install curl (and build-essential for other potential dependencies)
-# -------------------- THE DEFINITIVE FIX IS HERE --------------------
-RUN apt-get update && apt-get install -y --no-install-recommends curl build-essential \
-    && rm -rf /var/lib/apt/lists/*
-# --------------------------------------------------------------------
+# Install system dependencies (curl and libpq-dev for postgres connection)
+# CRITICAL FIX: Explicitly run apt-get as root using su -c
+RUN su -c "apt-get update && apt-get install -y --no-install-recommends curl build-essential libpq-dev && rm -rf /var/lib/apt/lists/*"
+
+USER 1000 # Switch to an arbitrary non-root user for security (e.g., 1000, a common default)
 
 # This makes Python imports reliable
 ENV PYTHONPATH=/app
@@ -26,6 +26,4 @@ COPY ./src /app/src
 COPY ./api /app/api
 
 EXPOSE 8080
-
-# Use the standard command to run the Flask application
 CMD ["flask", "run"]

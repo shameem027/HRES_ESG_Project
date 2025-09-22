@@ -1,4 +1,4 @@
-# --- File: requirements.txt (Definitive Final Version - Unlocked) ---
+# --- File: requirements.txt (Definitive Final Version - Cleaned) ---
 
 # Core Data Science & Simulation
 pandas
@@ -16,7 +16,7 @@ streamlit
 plotly
 requests
 
-# Development & MLOps Platform
+# Development & MLOps
 jupyterlab
 mlflow
 psycopg2-binary

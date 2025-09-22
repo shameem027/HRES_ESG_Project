@@ -113,7 +113,7 @@ with tab1:
     # --- Sidebar for User Inputs ---
     with st.sidebar:
         if os.path.exists('logo.png'):
-            st.image("logo.png", width=200)
+            st.image("logo.png", width=100)
         st.title("Project Controls")
 
         st.header("1. Scenario Definition")
@@ -470,7 +470,7 @@ with tab2:
         Examples:
         *   `"Find a solution for a small office"`
         *   `"I need a low cost solution for a small office with strong environmental impact"`
-        *   `"Suggest a highly resilient system for a new hospital with a focus on social good"`
+        *   `"Suggest a highly resilient system for a new hospital with a strong focus on social good"`
     """)
 
     if "chat_messages" not in st.session_state:

@@ -1,4 +1,4 @@
-# --- File: src/HRES_Dataset_Generator.py (Definitive Final Version - Comprehensive Costing & Extensive Dataset) ---
+# --- File: src/HRES_Dataset_Generator.py (Definitive Final Version - User-Defined Costs & Maintenance) ---
 # --- Author: Md Shameem Hossain ---
 # --- Purpose: Generates a comprehensive dataset of HRES solutions with detailed financial and ESG metrics. ---
 
@@ -22,7 +22,7 @@ PERMITTING_LEGAL_COST_FACTOR = 0.05  # 5% of hardware cost for Permitting/Legal
 OTHER_COMPONENTS_COST_FACTOR = 0.10  # 10% of hardware cost for other electrical/structural/BOS
 
 # Annual Operating Costs
-ANNUAL_OM_RATE = 0.02  # Annual Operations & Maintenance (2% of Initial Hardware + Installation costs)
+ANNUAL_OM_RATE = 0.02  # Annual Operations & Maintenance (2% of Total Initial CAPEX)
 
 # Project Lifecycles
 PROJECT_LIFETIME_YEARS = 25
@@ -43,7 +43,6 @@ PRICE_CHEIAS = 0.18
 PRICE_VAZIO = 0.11
 GRID_EXPORT_PRICE = 0.05
 
-# ESG KPI Simulation Constants
 CO2_REDUCTION_PER_KWH = 0.000199
 WATER_SAVED_PER_KWH_RE = 0.002
 LAND_USE_SOLAR_SQM_PER_PANEL = 1.7  # per 0.5 kW panel
@@ -127,6 +126,7 @@ def simulate_hres_yearly(config, load_profile, price_schedule, total_gen, solar_
     for hour in range(HOURS_IN_YEAR):
         net_power = total_gen[hour] - load_profile[hour]
         if net_power > 0:
+            # Charge battery
             charge_amount = min(net_power, config['battery_kwh'] - battery_soc)
             battery_soc += charge_amount * np.sqrt(BATTERY_ROUNDTRIP_EFFICIENCY)
             surplus = net_power - charge_amount
@@ -138,6 +138,7 @@ def simulate_hres_yearly(config, load_profile, price_schedule, total_gen, solar_
             total_curtailment += (surplus - grid_export)  # Curtailment is unexported surplus
             revenue_from_export += grid_export * GRID_EXPORT_PRICE
         else:
+            # Discharge battery
             discharge_amount = min(abs(net_power), battery_soc - min_soc)
             battery_soc -= discharge_amount
             net_power += discharge_amount / np.sqrt(BATTERY_ROUNDTRIP_EFFICIENCY)  # Account for roundtrip efficiency
@@ -153,14 +154,20 @@ def simulate_hres_yearly(config, load_profile, price_schedule, total_gen, solar_
 
     # Calculate additional annual costs (O&M, battery replacement, financing)
     # Annual O&M is a percentage of the initial hardware + installation costs
-    annual_om_cost = initial_hardware_cost_raw * (1 + INSTALLATION_OVERHEAD_FACTOR) * ANNUAL_OM_RATE
+    # Total initial CAPEX components (excluding annual costs)
+    total_initial_capex_calc = initial_hardware_cost_raw + \
+                               (initial_hardware_cost_raw * INSTALLATION_OVERHEAD_FACTOR) + \
+                               (initial_hardware_cost_raw * ENGINEERING_CONSULTING_COST_FACTOR) + \
+                               (initial_hardware_cost_raw * PERMITTING_LEGAL_COST_FACTOR) + \
+                               (initial_hardware_cost_raw * OTHER_COMPONENTS_COST_FACTOR)
+
+    annual_om_cost = total_initial_capex_calc * ANNUAL_OM_RATE
 
     # Amortized Battery Replacement Cost (twice over 25 years)
     num_battery_replacements = max(0, int(np.floor(
         PROJECT_LIFETIME_YEARS / BATTERY_LIFETIME_YEARS)) - 1)  # First battery is part of initial cost
-    total_battery_replacement_cost_over_lifetime = num_battery_replacements * (
-                config['battery_kwh'] * COST_PER_BATTERY_KWH)
-    annual_amortized_battery_replacement_cost = total_battery_replacement_cost_over_lifetime / PROJECT_LIFETIME_YEARS
+    total_battery_replacement_cost = num_battery_replacements * (config['battery_kwh'] * COST_PER_BATTERY_KWH)
+    annual_amortized_battery_replacement_cost = total_battery_replacement_cost / PROJECT_LIFETIME_YEARS
 
     # Annual financing cost is applied to the total initial CAPEX
     annual_financing_cost = config['total_cost'] * FINANCING_INTEREST_RATE

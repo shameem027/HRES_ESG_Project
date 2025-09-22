@@ -10,7 +10,9 @@ import os
 # --- Configuration ---
 # Ensure the /opt/airflow/src directory is in Python's path for module imports
 sys.path.append('/opt/airflow/src')
-MLFLOW_TRACKING_URI = "http://hres_mlflow:5000"  # Use the service name for Docker networking
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://hres_mlflow:5000")  # Use hres_mlflow service name
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+mlflow.set_experiment("HRES_ML_Prediction_Models")
 
 
 @dag(

@@ -97,12 +97,10 @@ class HRES_Decision_Engine:
         min_self_sufficiency = 100.0 - user_grid_dependency_pct
         min_wind_contribution_pct = 15.0  # User requested minimum 15% wind turbine contribution
 
-        # Ensure 'wind_contribution_pct' column exists before filtering
         if 'wind_contribution_pct' not in scaled_scenario_df.columns:
             logger.error("'wind_contribution_pct' column missing from scaled_scenario_df. This is a critical error.")
             return None, "Internal error: Wind contribution data missing for filtering."
 
-        # Filter by grid dependency and wind contribution
         feasible_solutions = scaled_scenario_df[
             (scaled_scenario_df['self_sufficiency_pct'] >= min_self_sufficiency) &
             (scaled_scenario_df['wind_contribution_pct'] >= min_wind_contribution_pct)
@@ -111,8 +109,6 @@ class HRES_Decision_Engine:
         if feasible_solutions.empty:
             return None, f"No solutions meet the {min_self_sufficiency:.1f}% self-sufficiency target AND minimum {min_wind_contribution_pct:.1f}% wind contribution."
 
-        # Add a filter for realistic payback period to discard extremely long paybacks
-        # This is important when base costs are low and savings can be exaggerated without full financing models
         feasible_solutions = feasible_solutions[feasible_solutions[
                                                     'payback_period_years'] <= PROJECT_LIFETIME_YEARS * 2].copy()  # Example: max 50 years payback
 
