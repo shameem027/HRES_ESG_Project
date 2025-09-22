@@ -119,23 +119,16 @@ with tab_recommender:
                            format_number(kpis.get('env_water_savings_m3_yr', 0)),
                            f"{kpis.get('env_waste_factor_pct', 0):.1f}"]}))
         with s_kpis:
-            with st.expander("🤝 Social KPIs", expanded=True): st.table(pd.DataFrame({'KPI': ['Local Jobs Created',
-                                                                                             'Energy Resilience (hrs)',
-                                                                                             'Grid Strain Reduction (%)',
-                                                                                             'Community Investment (€)'],
-                                                                                     'Value': [
-                                                                                         f"{kpis.get('soc_local_jobs_fte', 0):.2f}",
-                                                                                         f"{kpis.get('soc_energy_resilience_hrs', 0):.1f}",
-                                                                                         f"{kpis.get('soc_grid_strain_reduction_pct', 0):.1f}",
-                                                                                         format_currency(kpis.get(
-                                                                                             'soc_community_investment_eur',
-                                                                                             0))]}))
+            with st.expander("🤝 Social KPIs", expanded=True): st.table(pd.DataFrame(
+                {'KPI': ['Local Jobs Created', 'Energy Resilience (hrs)', 'Grid Strain Reduction (%)'],
+                 'Value': [f"{kpis.get('soc_local_jobs_fte', 0):.2f}",
+                           f"{kpis.get('soc_energy_resilience_hrs', 0):.1f}",
+                           f"{kpis.get('soc_grid_strain_reduction_pct', 0):.1f}"]}))
         with g_kpis:
             with st.expander("🏛️ Governance KPIs", expanded=True): st.table(pd.DataFrame(
-                {'KPI': ['Payback Plausibility (1-10)', 'Supply Chain Score (1-10)', 'Operational Risk (1-10)'],
+                {'KPI': ['Payback Plausibility (1-10)', 'Supply Chain Score (1-10)'],
                  'Value': [f"{kpis.get('gov_payback_plausibility_score', 0):.1f}",
-                           f"{kpis.get('gov_supply_chain_transparency_score', 0):.1f}",
-                           f"{kpis.get('gov_operational_risk_score', 0):.1f}"]}))
+                           f"{kpis.get('gov_supply_chain_transparency_score', 0):.1f}"]}))
         st.markdown("**Pareto Front: Feasible Solution Trade-offs**");
         pareto_data = st.session_state.recommendation.get('intermediate_results', {}).get('pareto_front', [])
         if pareto_data:
@@ -154,8 +147,9 @@ with tab_predictor:
     st.warning(
         "️️️⚠️ **Prerequisite:** This feature requires the ML models to be trained. If this is the first time running the system, please go to the **Airflow UI** (`http://localhost:8080`), un-pause the `HRES_PhD_Automation_Pipeline` DAG, and trigger a manual run.")
     p_col1, p_col2, p_col3 = st.columns(3);
-    ml_scenario = p_col1.selectbox("Facility Type", ("Small_Office", "Hospital", "University_Campus"),
-                                   key="ml_scenario");
+    ml_scenario = p_col1.selectbox("Facility Type",
+                                   ("Small_Office", "Hospital", "University_Campus", "Industrial_Facility",
+                                    "Data_Center"), key="ml_scenario");
     num_solar = p_col2.number_input("Number of Solar Panels", 0, 10000, 1000);
     num_wind = p_col1.number_input("Number of Wind Turbines", 0, 500, 50);
     battery_kwh = p_col2.number_input("Battery Storage (kWh)", 0, 20000, 2000)
@@ -197,7 +191,7 @@ with tab_advisor:
     for message in st.session_state.messages:
         with st.chat_message(message["role"]): st.markdown(message["content"])
 
-    # Use st.chat_input, the standard for chat interfaces
+    # **FIX**: Use st.chat_input, the standard for chat interfaces
     if prompt := st.chat_input("Your request:", key="chat_input_main"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
