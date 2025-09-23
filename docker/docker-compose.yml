@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive, Corrected, Final Version) ---
+# --- File: docker/docker-compose.yml (Definitive, Final, Simplified Version) ---
 services:
   hres_postgres:
     image: postgres:13
@@ -16,10 +16,10 @@ services:
 
   # This service now correctly initializes the Airflow DB and exits
   airflow-init:
-    container_name: airflow-init
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
+    container_name: airflow-init
     env_file: .env
     entrypoint: /bin/bash
     command:
@@ -27,8 +27,8 @@ services:
       - |
         airflow db init
         airflow users create \
-          --username ${AIRFLOW_WWW_USER_USERNAME} \
-          --password ${AIRFLOW_WWW_USER_PASSWORD} \
+          --username ${_AIRFLOW_WWW_USER_USERNAME} \
+          --password ${_AIRFLOW_WWW_USER_PASSWORD} \
           --firstname Shameem \
           --lastname Hossain \
           --role Admin \
@@ -40,16 +40,17 @@ services:
         condition: service_healthy
 
   hres_airflow_webserver:
-    container_name: hres_airflow_webserver
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: airflow webserver
+    container_name: hres_airflow_webserver
+    command: webserver
     env_file: .env
     ports:
       - "8080:8080"
     volumes:
-      - airflow_logs:/opt/airflow/logs
+      - ../src:/opt/airflow/src
+      - ../airflow/dags:/opt/airflow/dags
     networks:
       - hres_network
     healthcheck:
@@ -62,14 +63,15 @@ services:
         condition: service_completed_successfully
 
   hres_airflow_scheduler:
-    container_name: hres_airflow_scheduler
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: airflow scheduler
+    container_name: hres_airflow_scheduler
+    command: scheduler
     env_file: .env
     volumes:
-      - airflow_logs:/opt/airflow/logs
+      - ../src:/opt/airflow/src
+      - ../airflow/dags:/opt/airflow/dags
     networks:
       - hres_network
     depends_on:
@@ -77,16 +79,15 @@ services:
         condition: service_healthy
 
   hres_mlflow:
-    container_name: hres_mlflow
     build:
       context: ..
       dockerfile: docker/Dockerfile.mlflow
-    env_file: .env
-    environment:
-      - DB_HOST=hres_postgres
-      - DB_PORT=5432
-      - BACKEND_STORE_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
-      - ARTIFACT_ROOT=file:/mlflow/artifacts
+    container_name: hres_mlflow
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
+      --default-artifact-root file:/mlflow/artifacts
+      --host 0.0.0.0
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
     ports:
@@ -98,28 +99,24 @@ services:
         condition: service_healthy
 
   hres_api:
-    container_name: hres_api
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
-    env_file: .env # <-- CRITICAL FIX FOR AI ADVISOR
+    container_name: hres_api
+    env_file: .env
     ports:
       - "8081:8080"
     networks:
       - hres_network
-    environment:
-      - MLFLOW_TRACKING_URI=http://hres_mlflow:5000
     depends_on:
       hres_mlflow:
         condition: service_started
-      hres_airflow_scheduler:
-        condition: service_started
 
   hres_jupyter:
-    container_name: hres_jupyter
     build:
       context: ..
       dockerfile: docker/Dockerfile.jupyter
+    container_name: hres_jupyter
     command: "start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''"
     ports:
       - "8888:8888"
@@ -130,10 +127,10 @@ services:
       - hres_network
 
   hres_ui:
-    container_name: hres_ui
     build:
       context: ..
       dockerfile: docker/Dockerfile.ui
+    container_name: hres_ui
     ports:
       - "8501:8501"
     networks:
@@ -148,4 +145,3 @@ networks:
 volumes:
   postgres_db_data:
   mlflow_artifacts:
-  airflow_logs:
