@@ -1,4 +1,4 @@
-# --- File: docker/docker-compose.yml (Definitive, Final, Corrected Version) ---
+# --- File: docker/docker-compose.yml (Definitive, Simplified, Final Version) ---
 services:
   hres_postgres:
     image: postgres:13
@@ -44,7 +44,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    # --- CRITICAL FIX: The command must be 'airflow webserver' ---
     command: airflow webserver
     env_file: .env
     ports:
@@ -67,7 +66,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    # --- CRITICAL FIX: The command must be 'airflow scheduler' ---
     command: airflow scheduler
     env_file: .env
     volumes:
@@ -86,7 +84,7 @@ services:
     env_file: .env
     environment:
       - DB_HOST=hres_postgres
-      - DB_PORT=5422
+      - DB_PORT=5432
       - BACKEND_STORE_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
       - ARTIFACT_ROOT=file:/mlflow/artifacts
     volumes:
