@@ -3,7 +3,6 @@ import requests
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import time
 
 # API Base URL
 API_BASE_URL = "http://hres_api:8080"
@@ -33,7 +32,6 @@ st.set_page_config(page_title="HRES ESG Recommender", page_icon="💡", layout="
 
 with st.sidebar:
     st.image("logo.png", use_column_width=True)
-    st.success("System Ready", icon="✅")
     st.title("⚙️ HRES System Parameters")
 
     with st.form("recommender_form"):
@@ -48,9 +46,6 @@ with st.sidebar:
         esg_weights.social = st.slider("Social Focus", 0.0, 1.0, 0.25, 0.05)
         esg_weights.governance = st.slider("Governance Focus", 0.0, 1.0, 0.25, 0.05)
 
-        total_weight = esg_weights.cost + esg_weights.environment + esg_weights.social + esg_weights.governance
-        st.metric("Total Weight (Normalized to 1.0)", f"{total_weight:.2f}")
-
         submitted = st.form_submit_button("🚀 Find Best Solution", use_container_width=True)
 
 st.title("💡 HRES ESG Recommender System")
@@ -63,7 +58,7 @@ with tab_recommender:
         request_data = RecommendRequest(scenario_name=scenario_name, annual_demand_kwh=annual_demand_kwh, user_grid_dependency_pct=user_grid_dependency_pct, esg_weights=esg_weights)
         try:
             response = requests.post(f"{API_BASE_URL}/recommend", json=request_data.model_dump())
-            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+            response.raise_for_status()
             recommendation = response.json()
             st.success(f"**Optimal Solution Found!**")
 
@@ -73,7 +68,6 @@ with tab_recommender:
             m3.metric("Payback Period", f"{recommendation['payback_period_years']:.1f} Yrs")
             m4.metric("Self-Sufficiency", f"{recommendation['self_sufficiency_pct']:.1f}%")
 
-            st.markdown("---")
             v1, v2 = st.columns([1, 1])
 
             with v1:
@@ -129,7 +123,6 @@ with tab_recommender:
 with tab_predictor:
     st.header("⚡ ML Fast Predictor")
     st.success("✅ **System Ready:** The ML Models have been trained.")
-    # Add ML prediction functionality here if desired
 
 with tab_advisor:
     st.header("🤖 AI Advisor")
