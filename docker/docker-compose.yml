@@ -44,6 +44,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
+    # --- CRITICAL FIX: The command must be 'airflow webserver' ---
     command: airflow webserver
     env_file: .env
     ports:
@@ -66,6 +67,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
+    # --- CRITICAL FIX: The command must be 'airflow scheduler' ---
     command: airflow scheduler
     env_file: .env
     volumes:
