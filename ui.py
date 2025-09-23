@@ -32,7 +32,7 @@ if not status or not status.get("decision_engine_loaded", False) or not status.g
     st.title("💡 HRES ESG Recommender System")
     st.info("""**System is Initializing...**
     The fully automated Airflow pipeline is generating data and training models. This one-time process may take 5-10 minutes on first startup.
-    This page will automatically refresh. You can monitor live progress in the Airflow UI at [http://localhost:8080](http://localhost:8080) (user: airflow, pass: airflow).""",
+    This page will automatically refresh. You can monitor live progress in the Airflow UI at [http://localhost:8088](http://localhost:8088) (user: airflow, pass: airflow).""",
             icon="⚙️")
     with st.spinner("Waiting for backend services..."):
         time.sleep(30)
