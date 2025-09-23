@@ -1,9 +1,13 @@
-# --- File: docker/docker-compose.yml (Definitive, Corrected, Final Version) ---
+version: "3.9"
+
 services:
   hres_postgres:
     image: postgres:13
     container_name: hres_postgres
-    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_db_data:/var/lib/postgresql/data
     networks:
@@ -14,131 +18,42 @@ services:
       timeout: 5s
       retries: 5
 
-  airflow-init:
-    container_name: airflow-init
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.airflow
-    env_file: .env
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        airflow db init
-        airflow users create \
-          --username ${AIRFLOW_WWW_USER_USERNAME} \
-          --password ${AIRFLOW_WWW_USER_PASSWORD} \
-          --firstname Shameem \
-          --lastname Hossain \
-          --role Admin \
-          --email shameem.hossain@email.com || true
-    volumes:
-      - airflow_data:/opt/airflow # CORRECTED: Mount the shared volume
-    networks:
-      - hres_network
-    depends_on:
-      hres_postgres:
-        condition: service_healthy
-
-  hres_airflow_webserver:
-    container_name: hres_airflow_webserver
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.airflow
-    command: airflow webserver
-    env_file: .env
-    ports:
-      - "8088:8080" # NOTE: Using host port 8088 to avoid common conflicts. Access at http://localhost:8088
-    volumes:
-      - airflow_data:/opt/airflow # CORRECTED: Mount the shared volume for config, dags, and logs
-    networks:
-      - hres_network
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    depends_on:
-      airflow-init:
-        condition: service_completed_successfully
-
-  hres_airflow_scheduler:
-    container_name: hres_airflow_scheduler
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.airflow
-    command: airflow scheduler
-    env_file: .env
-    volumes:
-      - airflow_data:/opt/airflow # CORRECTED: Mount the shared volume for config, dags, and logs
-    networks:
-      - hres_network
-    depends_on:
-      hres_airflow_webserver:
-        condition: service_healthy
-
-  hres_mlflow:
-    container_name: hres_mlflow
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.mlflow
-    env_file: .env
-    environment:
-      - DB_HOST=hres_postgres
-      - DB_PORT=5432
-      - BACKEND_STORE_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
-      - ARTIFACT_ROOT=file:/mlflow/artifacts
-    volumes:
-      - mlflow_artifacts:/mlflow/artifacts
-    ports:
-      - "5000:5000"
-    networks:
-      - hres_network
-    depends_on:
-      hres_postgres:
-        condition: service_healthy
-
   hres_api:
-    container_name: hres_api
     build:
       context: ..
       dockerfile: docker/Dockerfile.api
-    env_file: .env
+    environment:
+      API_BASE_URL: http://hres_api:8080  # Add API_BASE_URL here too
     ports:
       - "8081:8080"
     networks:
       - hres_network
     depends_on:
-      hres_mlflow:
-        condition: service_started
-      hres_airflow_scheduler:
-        condition: service_started
-
-  hres_jupyter:
-    container_name: hres_jupyter
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.jupyter
-    command: "start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''"
-    ports:
-      - "8888:8888"
-    volumes:
-      - ../src:/home/jovyan/src
-      - ../notebooks:/home/jovyan/notebooks
-    networks:
-      - hres_network
+      hres_postgres:
+        condition: service_healthy
 
   hres_ui:
-    container_name: hres_ui
     build:
       context: ..
       dockerfile: docker/Dockerfile.ui
     ports:
       - "8501:8501"
+    environment:
+      API_BASE_URL: http://hres_api:8080
     networks:
       - hres_network
-    environment:
-      - API_BASE_URL=http://hres_api:8080
+    depends_on:
+      - hres_api  # Ensure API is running before UI starts
+
+  jupyter_lab:
+    image: jupyter/scipy-notebook:latest
+    ports:
+      - "8889:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./src:/home/jovyan/src
+    networks:
+      - hres_network
 
 networks:
   hres_network:
@@ -146,5 +61,3 @@ networks:
 
 volumes:
   postgres_db_data:
-  mlflow_artifacts:
-  airflow_data: # CORRECTED: Replaced airflow_logs with a unified volume
