@@ -11,15 +11,18 @@ def format_currency(value): return f"€{value:,.0f}"
 def format_number(value): return f"{value:,.0f}"
 
 with st.sidebar:
-    st.image("logo.png", use_column_width=True); st.title("⚙️ HRES System Parameters")
+    st.image("logo.png", use_column_width=True)
+    st.title("⚙️ HRES System Parameters")
     st.markdown("Define your facility and priorities to find the optimal HRES solution.")
     with st.form("recommender_form"):
         scenario_name = st.selectbox("Facility Type", ("Small_Office", "University_Campus", "Hospital", "Industrial_Facility", "Data_Center"))
         annual_demand_kwh = st.number_input("Annual Electricity Demand (kWh)", min_value=10000, value=250000, step=10000)
         user_grid_dependency_pct = st.slider("Max. Grid Dependency (%)", 0, 100, 30)
         st.markdown("**ESG & Cost Priorities**")
-        cost_weight = st.slider("Cost Focus", 0.0, 1.0, 0.25, 0.05); env_weight = st.slider("Environmental Focus", 0.0, 1.0, 0.25, 0.05)
-        social_weight = st.slider("Social Focus", 0.0, 1.0, 0.25, 0.05); gov_weight = st.slider("Governance Focus", 0.0, 1.0, 0.25, 0.05)
+        cost_weight = st.slider("Cost Focus", 0.0, 1.0, 0.25, 0.05)
+        env_weight = st.slider("Environmental Focus", 0.0, 1.0, 0.25, 0.05)
+        social_weight = st.slider("Social Focus", 0.0, 1.0, 0.25, 0.05)
+        gov_weight = st.slider("Governance Focus", 0.0, 1.0, 0.25, 0.05)
         total_weight = cost_weight + env_weight + social_weight + gov_weight
         st.metric("Total Weight (Normalized)", f"{1.0:.2f}")
         submitted = st.form_submit_button("🚀 Find Best Solution", use_container_width=True)
