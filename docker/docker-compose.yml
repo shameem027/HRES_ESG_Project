@@ -25,7 +25,8 @@ services:
     command:
       - -c
       - |
-        airflow db upgrade
+        # --- CRITICAL FIX: Changed 'upgrade' to 'init' ---
+        airflow db init
         airflow users create \
           --username ${AIRFLOW_WWW_USER_USERNAME} \
           --password ${AIRFLOW_WWW_USER_PASSWORD} \
@@ -44,7 +45,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    # --- CRITICAL FIX: The command must be 'airflow webserver' ---
     command: airflow webserver
     env_file: .env
     ports:
@@ -67,7 +67,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    # --- CRITICAL FIX: The command must be 'airflow scheduler' ---
     command: airflow scheduler
     env_file: .env
     volumes:
