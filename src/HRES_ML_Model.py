@@ -1,7 +1,4 @@
 # --- File: src/HRES_ML_Model.py ---
-# --- Author: Md Shameem Hossain ---
-# --- Purpose: Trains and logs Machine Learning models to predict HRES outcomes for faster inference. ---
-
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
@@ -14,9 +11,6 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# MLflow setup will be handled by the environment (Airflow DAG or API container)
-# MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://hres_mlflow:5000")
-# mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 mlflow.set_experiment("HRES_ML_Prediction_Models")
 
 
@@ -69,7 +63,6 @@ class HRESMLPredictor:
                 mlflow.log_params(params)
                 mlflow.log_metrics({"mae": mae, "r2": r2})
 
-                # Log the scenario encoder with the model for consistent inference
                 mlflow.log_dict(self.scenario_encoder, "scenario_encoder.json")
 
                 mlflow.sklearn.log_model(
@@ -92,15 +85,13 @@ class HRESMLPredictor:
             latest_version_obj = latest_versions[0]
             model_uri = f"models:/{model_name}/{latest_version_obj.version}"
             model = mlflow.sklearn.load_model(model_uri)
-            logger.info(
-                f"✅ Successfully loaded ML model '{model_name}' v{latest_version_obj.version} from '{model_uri}'")
+            logger.info(f"✅ Successfully loaded ML model '{model_name}' v{latest_version_obj.version}")
 
-            # Download the associated encoder artifact
             run_id = latest_version_obj.run_id
             local_path = mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path="scenario_encoder.json")
             with open(local_path, 'r') as f:
                 scenario_encoder = json.load(f)
-            logger.info(f"✅ Loaded associated scenario encoder: {scenario_encoder}")
+            logger.info(f"✅ Loaded associated scenario encoder.")
 
             return model, scenario_encoder
         except Exception as e:
@@ -109,8 +100,6 @@ class HRESMLPredictor:
 
 
 def main():
-    # This allows the script to be run manually for testing/debugging
-    # It assumes it's being run from the project root or the `src` directory
     script_dir = os.path.dirname(__file__)
     dataset_path = os.path.join(script_dir, 'HRES_Dataset.csv')
     predictor = HRESMLPredictor(model_name_suffix="_V1")

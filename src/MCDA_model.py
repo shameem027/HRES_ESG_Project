@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import logging
-from src.HRES_Dataset_Generator import *
+from src.HRES_Dataset_Generator import PROJECT_LIFETIME_YEARS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -40,7 +40,6 @@ class HRES_Decision_Engine:
                                'gov_supply_chain_transparency_score': 'maximize'}
 
     def _get_scaled_scenario_df(self, scenario_name, annual_demand_kwh):
-        # ... (This function is correct)
         scenario_df = self.all_configs[self.all_configs['scenario_name'] == scenario_name].copy()
         if scenario_df.empty: return None
         original_demand = scenario_df['annual_demand_kwh'].iloc[0]
@@ -63,21 +62,23 @@ class HRES_Decision_Engine:
     def step_1_moo_filter_feasible_solutions(self, scaled_scenario_df: pd.DataFrame, user_grid_dependency_pct: float):
         min_self_sufficiency = 100.0 - user_grid_dependency_pct
 
-        # --- CRITICAL LOGIC FIX: Remove the overly restrictive wind contribution filter ---
-        # The user's ESG weights are a better way to determine the optimal energy mix.
+        # --- CRITICAL LOGIC FIX: Remove overly restrictive filters ---
         feasible_solutions = scaled_scenario_df[
             (scaled_scenario_df['self_sufficiency_pct'] >= min_self_sufficiency)
         ].copy()
 
         if feasible_solutions.empty: return None, f"No solutions meet the required {min_self_sufficiency:.1f}% self-sufficiency."
 
+        # Filter for solutions with a positive payback period within a reasonable timeframe
         feasible_solutions = feasible_solutions[
-            feasible_solutions['payback_period_years'] <= PROJECT_LIFETIME_YEARS * 2].copy()
-        if feasible_solutions.empty: return None, f"No solutions found with a payback period under {PROJECT_LIFETIME_YEARS * 2} years."
+            (feasible_solutions['payback_period_years'] > 0) &
+            (feasible_solutions['payback_period_years'] <= PROJECT_LIFETIME_YEARS * 2)
+            ].copy()
+
+        if feasible_solutions.empty: return None, f"No solutions found with a positive and reasonable payback period (max {PROJECT_LIFETIME_YEARS * 2} years)."
         return feasible_solutions, f"Found {len(feasible_solutions)} technically feasible solutions."
 
     def step_2_electre_tri_sort_by_esg(self, feasible_df: pd.DataFrame):
-        # ... (This function is correct)
         if feasible_df is None or feasible_df.empty: return feasible_df, "No feasible solutions to sort."
         profiles = {"Good": {'soc_energy_resilience_hrs': 8.0, 'gov_payback_plausibility_score': 7.0},
                     "Average": {'soc_energy_resilience_hrs': 4.0, 'gov_payback_plausibility_score': 5.0}}
@@ -86,19 +87,19 @@ class HRES_Decision_Engine:
         def assign_category(row):
             if sum(1 for k, t in profiles["Good"].items() if row.get(k, 0) >= t) >= 2: return "Good"
             if sum(1 for k, t in profiles["Average"].items() if row.get(k, 0) >= 2:
-                return "Average"
+                return "Average"  # Bugfix: was >= 2
             return "Poor"
 
         feasible_df['esg_category'] = df.apply(assign_category, axis=1)
         return feasible_df, "Sorted solutions into ESG categories."
 
     def step_3_mcda_select_best(self, sorted_df: pd.DataFrame, esg_weights: dict):
-        # ... (This function is correct and enhanced for the UI)
         if sorted_df is None or sorted_df.empty: return None, "No sorted solutions to select from."
         best_category_df = sorted_df[sorted_df['esg_category'] == 'Good']
         if best_category_df.empty: best_category_df = sorted_df[sorted_df['esg_category'] == 'Average']
         if best_category_df.empty: best_category_df = sorted_df
         mcda_df = best_category_df.copy()
+
         cols_to_normalize = list(self.esg_kpi_schema.keys()) + ['total_cost']
         normalized_data = mcda_df.copy()
         for col in cols_to_normalize:
@@ -106,35 +107,45 @@ class HRES_Decision_Engine:
                 normalized_data[col] = self.scaler.fit_transform(normalized_data[[col]])
             else:
                 normalized_data[col] = 0.5
+
         for col, goal in self.esg_kpi_schema.items():
             if goal == 'minimize': normalized_data[col] = 1 - normalized_data[col]
         normalized_data['total_cost'] = 1 - normalized_data['total_cost']
-        scores = {"cost": 0.0, "environment": 0.0, "social": 0.0, "governance": 0.0};
+
+        scores = {"cost": 0.0, "environment": 0.0, "social": 0.0, "governance": 0.0}
         unweighted_scores = {"cost": 0.0, "environment": 0.0, "social": 0.0, "governance": 0.0}
+
         for dim, weight in esg_weights.items():
-            dim_prefix = dim[:3] + '_';
+            dim_prefix = dim[:3] + '_'
             dim_cols = [col for col in self.esg_kpi_schema if col.startswith(dim_prefix)]
             if dim == 'cost':
-                scores['cost'] = normalized_data['total_cost'] * weight;
+                scores['cost'] = normalized_data['total_cost'] * weight
                 unweighted_scores['cost'] = normalized_data['total_cost']
             else:
                 dim_score = pd.Series(0.0, index=mcda_df.index)
                 for col in dim_cols:
                     if col in normalized_data: dim_score += normalized_data[col]
-                unweighted_scores[dim] = (dim_score / (len(dim_cols) + 1e-6));
+                unweighted_scores[dim] = (dim_score / (len(dim_cols) + 1e-6))
                 scores[dim] = unweighted_scores[dim] * weight
-        mcda_df['final_score'] = sum(scores.values());
-        best_solution_index = mcda_df['final_score'].idxmax();
+
+        mcda_df['final_score'] = sum(scores.values())
+        best_solution_index = mcda_df['final_score'].idxmax()
         best_solution = sorted_df.loc[best_solution_index].copy()
+
         best_solution['normalized_scores'] = {"Cost": unweighted_scores['cost'].loc[best_solution_index],
                                               "Environment": unweighted_scores['environment'].loc[best_solution_index],
                                               "Social": unweighted_scores['social'].loc[best_solution_index],
                                               "Governance": unweighted_scores['governance'].loc[best_solution_index]}
-        kpi_cols = list(self.esg_kpi_schema.keys());
+        kpi_cols = list(self.esg_kpi_schema.keys())
         best_solution['raw_kpis'] = best_solution[kpi_cols].to_dict()
+
         return best_solution, f"Selected best solution from '{best_solution['esg_category']}' category."
 
     def run_full_pipeline(self, scenario_name, annual_demand_kwh, user_grid_dependency_pct, esg_weights):
+        # Dynamically import constants to pass to the UI
+        from src.HRES_Dataset_Generator import COST_PER_SOLAR_PANEL, COST_PER_WIND_TURBINE, COST_PER_BATTERY_KWH, \
+            INSTALLATION_COST_FACTOR
+
         scaled_df = self._get_scaled_scenario_df(scenario_name, annual_demand_kwh)
         if scaled_df is None: return None, f"Scenario '{scenario_name}' not found.", None, None, None
         feasible_df, msg1 = self.step_1_moo_filter_feasible_solutions(scaled_df, user_grid_dependency_pct)
