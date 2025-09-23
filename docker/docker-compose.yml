@@ -1,13 +1,9 @@
-version: "3.9"
-
+# --- File: docker/docker-compose.yml (Simplified) ---
 services:
   hres_postgres:
     image: postgres:13
     container_name: hres_postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+    env_file: .env
     volumes:
       - postgres_db_data:/var/lib/postgresql/data
     networks:
@@ -18,42 +14,66 @@ services:
       timeout: 5s
       retries: 5
 
-  hres_api:
+  hres_mlflow:
+    container_name: hres_mlflow
     build:
       context: ..
-      dockerfile: docker/Dockerfile.api
+      dockerfile: docker/Dockerfile.mlflow
+    env_file: .env
     environment:
-      API_BASE_URL: http://hres_api:8080  # Add API_BASE_URL here too
+      - DB_HOST=hres_postgres
+      - DB_PORT=5432
+      - BACKEND_STORE_URI=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@hres_postgres:5432/${POSTGRES_DB}
+      - ARTIFACT_ROOT=file:/mlflow/artifacts
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
     ports:
-      - "8081:8080"
+      - "5000:5000"
     networks:
       - hres_network
     depends_on:
       hres_postgres:
         condition: service_healthy
 
+  hres_api:
+    container_name: hres_api
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    env_file: .env
+    ports:
+      - "8081:8080"
+    networks:
+      - hres_network
+    depends_on:
+      hres_mlflow:
+        condition: service_started
+
+  hres_jupyter:
+    container_name: hres_jupyter
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.jupyter
+    command: "start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''"
+    ports:
+      - "8888:8888"
+    volumes:
+      - ../src:/home/jovyan/src
+      - ../notebooks:/home/jovyan/notebooks
+    networks:
+      - hres_network
+
   hres_ui:
+    container_name: hres_ui
     build:
       context: ..
       dockerfile: docker/Dockerfile.ui
     ports:
       - "8501:8501"
+    networks:
+      - hres_network
     environment:
-      API_BASE_URL: http://hres_api:8080
-    networks:
-      - hres_network
-    depends_on:
-      - hres_api  # Ensure API is running before UI starts
-
-  jupyter_lab:
-    image: jupyter/scipy-notebook:latest
-    ports:
-      - "8889:8888"
-    volumes:
-      - ./notebooks:/home/jovyan/notebooks
-      - ./src:/home/jovyan/src
-    networks:
-      - hres_network
+      - API_BASE_URL=http://hres_api:8080
 
 networks:
   hres_network:
@@ -61,3 +81,4 @@ networks:
 
 volumes:
   postgres_db_data:
+  mlflow_artifacts:

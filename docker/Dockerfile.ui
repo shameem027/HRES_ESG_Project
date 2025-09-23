@@ -1,32 +1,12 @@
-# --- File: docker/Dockerfile.ui ---
 FROM python:3.9-slim
-
-# Create a non-root user for the Streamlit app
 RUN groupadd -r streamlit && useradd -r -g streamlit streamlit
-
 WORKDIR /app
-
-# Copy and install requirements
-# Note: For cloud deployment, a smaller requirements-ui.txt would be used.
-# For Docker, the full requirements.txt is fine.
 COPY ../requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the Streamlit app and any assets like images
 COPY ./ui.py .
 COPY ./logo.png .
-
-# Change ownership of the app directory to the new user
 RUN chown -R streamlit:streamlit /app
-
-# Switch to the non-root user
 USER streamlit
-
-# Expose the port Streamlit runs on
 EXPOSE 8501
-
-# Add a healthcheck to verify the app is responsive
 HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health
-
-# Run the Streamlit app
 ENTRYPOINT ["streamlit", "run", "ui.py", "--server.port=8501", "--server.address=0.0.0.0"]

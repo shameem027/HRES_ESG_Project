@@ -1,28 +1,12 @@
-# --- File: docker/Dockerfile.jupyter ---
-# Use an official Jupyter base image which includes many scientific libraries
 FROM jupyter/scipy-notebook:latest
-
-# Switch to root user to install system-level packages and python libraries
 USER root
-
-# Copy requirements file and install project-specific dependencies
 COPY ../requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
     rm /tmp/requirements.txt
-
-# Copy the notebooks and src directory into the container's home directory
 COPY ./notebooks/ /home/jovyan/notebooks/
 COPY ./src/ /home/jovyan/src/
-
-# Set ownership of the copied files to the default jovyan user
-# NB_UID and NB_GID are variables provided by the base image
-RUN chown -R ${NB_UID}:${NB_GID} /home/jovyan/notebooks && \
-    chown -R ${NB_UID}:${NB_GID} /home/jovyan/src
-
-# Switch back to the non-root jovyan user
+RUN chown -R jovyan:jovyan /home/jovyan/notebooks && \
+    chown -R jovyan:jovyan /home/jovyan/src
 USER ${NB_USER}
-
-# The base image's entrypoint will start the Jupyter Lab server.
-# We just need to expose the port.
 EXPOSE 8888
