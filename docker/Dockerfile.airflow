@@ -13,9 +13,11 @@ RUN groupadd -r airflow && useradd -r -g airflow -d ${AIRFLOW_HOME} -s /bin/bash
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    build-essential libpq-dev freetds-dev libssl-dev libsasl2-dev curl netcat-openbsd \
+    build-essential libpq-dev freetds-dev libssl-dev libsasl2-dev curl netcat-openbsd git \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# The official Airflow entrypoint script is included in the apache-airflow package.
+# We just need to make sure it's used.
 COPY ../requirements.txt /requirements.txt
 
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -31,3 +33,6 @@ RUN mkdir -p ${AIRFLOW_HOME}/logs ${AIRFLOW_HOME}/plugins && \
 WORKDIR ${AIRFLOW_HOME}
 EXPOSE 8080
 USER airflow
+
+# The entrypoint is part of the official Airflow installation, we don't need a custom one.
+# The command will be provided by docker-compose.

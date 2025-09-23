@@ -67,7 +67,6 @@ else:
         ["📊 ESG Recommender", "⚡ ML Fast Predictor", "🤖 AI Advisor", "ℹ️ About"])
 
     with tab_recommender:
-        # ... (Dashboard code is correct and remains the same)
         st.header("Optimal Solution Dashboard")
         if submitted:
             payload = {"scenario_name": scenario_name, "annual_demand_kwh": annual_demand_kwh,
@@ -93,9 +92,9 @@ else:
             st.markdown("---")  # Visualizations...
 
     with tab_predictor:
-        # ... (ML Predictor code is correct and remains the same)
         st.header("Instantaneous Performance Estimate via Machine Learning")
-        st.success("✅ **System Ready:** The ML Models have been trained and are ready for use.")
+        st.success(
+            "✅ **System Ready:** The ML Models have been trained by the automated Airflow pipeline and are ready for use.")
         p_col1, p_col2, p_col3 = st.columns(3);
         ml_scenario = p_col1.selectbox("Facility Type",
                                        ("Small_Office", "Hospital", "University_Campus", "Industrial_Facility",
@@ -117,11 +116,9 @@ else:
             with st.chat_message(message["role"]): st.markdown(message["content"])
 
     with tab_about:
-        # ... (About tab content is correct and does not need to be changed)
         st.header("About This Project")
 
     # --- DEFINITIVE CHAT INPUT FIX ---
-    # Place the st.chat_input at the main level of the script, outside all containers.
     if prompt := st.chat_input("Ask the AI Advisor..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         try:

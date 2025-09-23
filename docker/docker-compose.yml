@@ -21,8 +21,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.airflow
     env_file: .env
+    entrypoint: /bin/bash
     command:
-      - bash
       - -c
       - |
         airflow db upgrade
@@ -44,7 +44,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: airflow webserver
+    command: webserver
     env_file: .env
     ports:
       - "8080:8080"
@@ -63,7 +63,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: airflow scheduler
+    command: scheduler
     env_file: .env
     volumes:
       - airflow_logs:/opt/airflow/logs
@@ -111,7 +111,7 @@ services:
     depends_on:
       hres_mlflow:
         condition: service_started
-      hres_airflow_scheduler:
+      hres_airflow_scheduler: # Wait for the scheduler to ensure the whole system is up
         condition: service_started
 
   hres_jupyter:
