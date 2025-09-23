@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # New service to handle DB initialization reliably
+  # This service now correctly initializes the Airflow DB and exits
   airflow-init:
     container_name: airflow-init
     build:
@@ -44,7 +44,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: webserver
+    command: airflow webserver
     env_file: .env
     ports:
       - "8080:8080"
@@ -52,8 +52,11 @@ services:
       - airflow_logs:/opt/airflow/logs
     networks:
       - hres_network
-    environment:
-      - MLFLOW_TRACKING_URI=http://hres_mlflow:5000
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     depends_on:
       airflow-init:
         condition: service_completed_successfully
@@ -63,17 +66,15 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.airflow
-    command: scheduler
+    command: airflow scheduler
     env_file: .env
     volumes:
       - airflow_logs:/opt/airflow/logs
     networks:
       - hres_network
-    environment:
-      - MLFLOW_TRACKING_URI=http://hres_mlflow:5000
     depends_on:
-      airflow-init:
-        condition: service_completed_successfully
+      hres_airflow_webserver:
+        condition: service_healthy
 
   hres_mlflow:
     container_name: hres_mlflow
@@ -106,12 +107,10 @@ services:
       - "8081:8080"
     networks:
       - hres_network
-    environment:
-      - MLFLOW_TRACKING_URI=http://hres_mlflow:5000
     depends_on:
       hres_mlflow:
         condition: service_started
-      hres_airflow_scheduler: # Wait for the scheduler to ensure the whole system is up
+      hres_airflow_scheduler:
         condition: service_started
 
   hres_jupyter:

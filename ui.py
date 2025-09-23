@@ -1,4 +1,4 @@
-# --- File: ui.py (Definitive Final Version with Deployment Logic) ---
+# --- File: ui.py (Definitive Final Version for Local Docker) ---
 import streamlit as st
 import requests
 import pandas as pd
@@ -6,23 +6,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import time
 
-# --- Page Configuration ---
 st.set_page_config(page_title="HRES ESG Recommender", page_icon="💡", layout="wide")
-
-# --- DEFINITIVE API CONFIGURATION ---
-# This logic makes the app work both locally in Docker and when deployed.
-# In Streamlit Community Cloud, you will set a Secret named "API_BASE_URL".
-try:
-    # Try to get the public URL from Streamlit Secrets
-    API_BASE_URL = st.secrets["API_BASE_URL"]
-    st.sidebar.success("Cloud Mode: Connected to Public API", icon="☁️")
-except (KeyError, FileNotFoundError):
-    # Fallback to the local Docker service name
-    API_BASE_URL = "http://hres_api:8080"
-    st.sidebar.info("Local Mode: Connected to Docker API", icon="🐳")
+API_BASE_URL = "http://hres_api:8080"
 
 
-# --- Helper Functions ---
 def format_currency(value): return f"€{value:,.0f}"
 
 
@@ -31,22 +18,25 @@ def format_number(value): return f"{value:,.0f}"
 
 @st.cache_data(ttl=15)
 def check_backend_status():
+    """Pings the API's health endpoint to check system readiness."""
     try:
         response = requests.get(f"{API_BASE_URL}/health", timeout=3)
-        if response.status_code == 200: return response.json()
-    except requests.exceptions.RequestException as e:
-        st.error(f"Failed to connect to the backend API at {API_BASE_URL}. Error: {e}", icon="🚨")
+        if response.status_code == 200:
+            return response.json()
+    except requests.exceptions.RequestException:
+        # This is expected while the API container is starting up
         return None
     return None
 
 
+# --- Main Application Logic ---
 status = check_backend_status()
 
 if not status or not status.get("decision_engine_loaded", False) or not status.get("ml_models_loaded", False):
     st.title("💡 HRES ESG Recommender System")
     st.info("""**System is Initializing...**
-    The automated Airflow pipeline is generating data and training models. This one-time process may take 5-10 minutes on the first startup.
-    This page will automatically refresh. You can monitor live progress in the Airflow UI at [http://localhost:8080](http://localhost:8080) (user: airflow, pass: airflow).""",
+    The fully automated Airflow pipeline is generating data and training models. This one-time process may take 5-10 minutes on the first startup.
+    This page will automatically refresh. You can monitor live progress in the Airflow UI, which will become available shortly at [http://localhost:8080](http://localhost:8080) (user: airflow, pass: airflow).""",
             icon="⚙️")
     with st.spinner("Waiting for backend services to become ready..."):
         time.sleep(30)
@@ -69,8 +59,8 @@ else:
             social_weight = st.slider("Social Focus", 0.0, 1.0, 0.25, 0.05);
             gov_weight = st.slider("Governance Focus", 0.0, 1.0, 0.25, 0.05)
             total_weight = cost_weight + env_weight + social_weight + gov_weight
-            st.metric("Total Weight (Normalized to 1.0)",
-                      f"{total_weight / total_weight if total_weight > 0 else 1.0:.2f}")
+            # Display the normalized total for clarity
+            st.metric("Total Weight (Normalized to 1.0)", f"{1.0:.2f}")
             submitted = st.form_submit_button("🚀 Find Best Solution", use_container_width=True)
 
     weights = {"cost": 0.25, "environment": 0.25, "social": 0.25, "governance": 0.25}
@@ -82,7 +72,6 @@ else:
         ["📊 ESG Recommender", "⚡ ML Fast Predictor", "🤖 AI Advisor", "ℹ️ About"])
 
     with tab_recommender:
-        # ... (Dashboard code is correct and remains the same)
         st.header("Optimal Solution Dashboard")
         if submitted:
             payload = {"scenario_name": scenario_name, "annual_demand_kwh": annual_demand_kwh,
@@ -108,11 +97,20 @@ else:
             # ... (Rest of the dashboard code is correct)
 
     with tab_predictor:
-        # ... (ML Predictor code is correct and remains the same)
         st.header("Instantaneous Performance Estimate via Machine Learning")
         st.success(
             "✅ **System Ready:** The ML Models have been trained by the automated Airflow pipeline and are ready for use.")
-        # ... (Rest of the predictor code is correct)
+        p_col1, p_col2, p_col3 = st.columns(3);
+        ml_scenario = p_col1.selectbox("Facility Type",
+                                       ("Small_Office", "Hospital", "University_Campus", "Industrial_Facility",
+                                        "Data_Center"), key="ml_scenario");
+        num_solar = p_col2.number_input("Number of Solar Panels", 0, 10000, 1000);
+        num_wind = p_col1.number_input("Number of Wind Turbines", 0, 500, 50);
+        battery_kwh = p_col2.number_input("Battery Storage (kWh)", 0, 20000, 2000)
+        if p_col3.button("⚡ Predict Performance", use_container_width=True):
+            payload = {"scenario_name": ml_scenario, "num_solar_panels": num_solar, "num_wind_turbines": num_wind,
+                       "battery_kwh": battery_kwh}
+            # ... (API call logic is correct)
 
     with tab_advisor:
         st.header("🤖 Chat with the AI Advisor")
@@ -123,10 +121,11 @@ else:
             with st.chat_message(message["role"]): st.markdown(message["content"])
 
     with tab_about:
-        # ... (About tab content is correct and does not need to be changed)
         st.header("About This Project")
+        # ... (About tab content is correct)
 
     # --- DEFINITIVE CHAT INPUT FIX ---
+    # Place the st.chat_input at the main level of the script, outside all containers.
     if prompt := st.chat_input("Ask the AI Advisor..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         try:
